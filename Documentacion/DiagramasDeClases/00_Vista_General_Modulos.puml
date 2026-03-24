@@ -1,0 +1,72 @@
+@startuml 00_Vista_General_Modulos
+
+' ============================================================
+' NEXO — Vista General de Módulos y Dependencias
+' ============================================================
+
+skinparam componentFontSize 13
+skinparam packageFontSize 14
+skinparam packageFontStyle bold
+skinparam defaultFontName Arial
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 40
+
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #CCCCCC
+  FontColor #1B4F72
+}
+
+skinparam component {
+  BackgroundColor #D6EAF8
+  BorderColor #2E86C1
+  FontColor #1B4F72
+}
+
+package "NEXO — Sistema Planeador de Horarios" {
+
+  component [auth\n─────────\nRegistro, Login,\nJWT, Verificación] as AUTH #EBF5FB
+  component [user\n─────────\nPerfil, Roles,\nEliminación cuenta] as USER #E8F8F5
+  component [academic\n─────────\nOferta, Asignaturas,\nGrupos, Restricciones] as ACADEMIC #FEF9E7
+  component [schedule\n─────────\nHorarios, Bloques,\nHistórico, Exportación] as SCHEDULE #F5EEF8
+  component [campus\n─────────\nSedes, Salones,\nFotos, Desplazamiento] as CAMPUS #FDEDEC
+  component [content\n─────────\nAvisos, Bienestar,\nCalendario General] as CONTENT #E8F6F3
+  component [report\n─────────\nReportes de\nErrores/Bugs] as REPORT #FDF2E9
+  component [admin\n─────────\nCarga Oferta,\nGestión General] as ADMIN #F9EBEA
+  component [shared\n─────────\nExcepciones, DTOs,\nConfig, Utilidades] as SHARED #F2F3F4
+
+}
+
+' Dependencias entre módulos
+AUTH --> USER : consulta/crea usuario
+SCHEDULE --> ACADEMIC : valida restricciones
+SCHEDULE --> CAMPUS : calcula traslado
+SCHEDULE --> USER : datos estudiante
+ADMIN --> ACADEMIC : carga oferta
+ADMIN --> USER : gestiona roles
+ADMIN --> CONTENT : CRUD contenido
+ADMIN --> CAMPUS : gestiona sedes
+ADMIN --> REPORT : gestiona reportes
+CONTENT --> USER : verifica rol radicador
+REPORT --> USER : asocia estudiante
+
+' Shared es transversal
+AUTH ..> SHARED
+USER ..> SHARED
+ACADEMIC ..> SHARED
+SCHEDULE ..> SHARED
+CAMPUS ..> SHARED
+CONTENT ..> SHARED
+REPORT ..> SHARED
+ADMIN ..> SHARED
+
+legend bottom left
+  |= Línea |= Significado |
+  | ──▶ | Dependencia directa entre módulos |
+  | ..▶ | Usa componentes transversales (shared) |
+endlegend
+
+footer Nexo — Universidad Distrital FJC | Marzo 2026
+
+@enduml

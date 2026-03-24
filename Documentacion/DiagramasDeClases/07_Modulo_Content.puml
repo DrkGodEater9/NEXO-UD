@@ -1,0 +1,239 @@
+@startuml 07_Modulo_Content
+
+' ============================================================
+' NEXO — Módulo: content
+' Avisos, Bienestar, Calendario General
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.content" #E8F6F3 {
+
+  package "entity" {
+    enum AnnouncementScope <<Enum>> {
+      FACULTAD
+      UNIVERSIDAD
+    }
+
+    enum AnnouncementType <<Enum>> {
+      GENERAL
+      ASAMBLEA
+    }
+
+    enum WelfareCategory <<Enum>> {
+      APOYO_ALIMENTARIO
+      BECAS
+      SALUD_MENTAL
+      SERVICIOS_SALUD
+    }
+
+    enum CalendarEventType <<Enum>> {
+      FESTIVO
+      PARO
+      INSCRIPCIONES
+      OTRO
+    }
+
+    class Announcement <<@Entity>> {
+      - id : Long
+      - title : String
+      - body : String  <<@Column(length=5000)>>
+      - scope : AnnouncementScope
+      - type : AnnouncementType
+      - faculty : String  <<nullable>>
+      - createdBy : Long  <<FK → User.id>>
+      - createdAt : LocalDateTime
+      - updatedAt : LocalDateTime
+    }
+
+    class WelfareContent <<@Entity>> {
+      - id : Long
+      - title : String
+      - description : String  <<@Column(length=5000)>>
+      - category : WelfareCategory
+      - links : String  <<nullable>>
+      - createdBy : Long  <<FK → User.id>>
+      - createdAt : LocalDateTime
+      - updatedAt : LocalDateTime
+    }
+
+    class CalendarEvent <<@Entity>> {
+      - id : Long
+      - title : String
+      - description : String
+      - eventType : CalendarEventType
+      - startDate : LocalDate
+      - endDate : LocalDate
+      - createdBy : Long  <<FK → User.id>>
+    }
+
+    Announcement --> AnnouncementScope
+    Announcement --> AnnouncementType
+    WelfareContent --> WelfareCategory
+    CalendarEvent --> CalendarEventType
+  }
+
+  package "dto" {
+    class AnnouncementRequest <<DTO>> {
+      - title : String  <<@NotBlank>>
+      - body : String  <<@NotBlank>>
+      - scope : AnnouncementScope
+      - type : AnnouncementType
+      - faculty : String
+    }
+
+    class AnnouncementResponse <<DTO>> {
+      - id : Long
+      - title : String
+      - body : String
+      - scope : String
+      - type : String
+      - faculty : String
+      - createdAt : LocalDateTime
+    }
+
+    class WelfareContentRequest <<DTO>> {
+      - title : String  <<@NotBlank>>
+      - description : String  <<@NotBlank>>
+      - category : WelfareCategory
+      - links : String
+    }
+
+    class WelfareContentResponse <<DTO>> {
+      - id : Long
+      - title : String
+      - description : String
+      - category : String
+      - links : String
+      - createdAt : LocalDateTime
+    }
+
+    class CalendarEventResponse <<DTO>> {
+      - id : Long
+      - title : String
+      - description : String
+      - eventType : String
+      - startDate : LocalDate
+      - endDate : LocalDate
+    }
+  }
+
+  package "repository" {
+    interface AnnouncementRepository <<@Repository>> {
+      + findByScope(scope) : List<Announcement>
+      + findByFaculty(faculty) : List<Announcement>
+      + findByType(type) : List<Announcement>
+      + findAllByOrderByCreatedAtDesc() : List<Announcement>
+    }
+
+    interface WelfareContentRepository <<@Repository>> {
+      + findByCategory(category) : List<WelfareContent>
+      + findAll() : List<WelfareContent>
+    }
+
+    interface CalendarEventRepository <<@Repository>> {
+      + findByStartDateBetween(from, to) : List<CalendarEvent>
+      + findByEventType(type) : List<CalendarEvent>
+    }
+  }
+
+  package "service" {
+    class AnnouncementService <<@Service>> {
+      - announcementRepository : AnnouncementRepository
+      - roleService : RoleService
+      --
+      + getAll() : List<AnnouncementResponse>
+      + getByScope(scope) : List<AnnouncementResponse>
+      + getByFaculty(faculty) : List<AnnouncementResponse>
+      + create(request, userId) : AnnouncementResponse
+      + update(id, request, userId) : AnnouncementResponse
+      + delete(id, userId) : void
+    }
+
+    class WelfareContentService <<@Service>> {
+      - welfareContentRepository : WelfareContentRepository
+      - roleService : RoleService
+      --
+      + getAll() : List<WelfareContentResponse>
+      + getByCategory(category) : List<WelfareContentResponse>
+      + create(request, userId) : WelfareContentResponse
+      + update(id, request, userId) : WelfareContentResponse
+      + delete(id, userId) : void
+    }
+
+    class GeneralCalendarService <<@Service>> {
+      - calendarEventRepository : CalendarEventRepository
+      --
+      + getEvents(from, to) : List<CalendarEventResponse>
+      + getByType(type) : List<CalendarEventResponse>
+      + create(event) : CalendarEventResponse
+      + delete(id) : void
+    }
+  }
+
+  package "controller" {
+    class AnnouncementController <<@RestController>> {
+      - announcementService : AnnouncementService
+      --
+      + getAnnouncements(scope, faculty) : ResponseEntity
+      + createAnnouncement(req) : ResponseEntity
+      + updateAnnouncement(id, req) : ResponseEntity
+      + deleteAnnouncement(id) : ResponseEntity
+    }
+
+    class WelfareController <<@RestController>> {
+      - welfareContentService : WelfareContentService
+      --
+      + getWelfareContent(category) : ResponseEntity
+      + createContent(req) : ResponseEntity
+      + updateContent(id, req) : ResponseEntity
+      + deleteContent(id) : ResponseEntity
+    }
+
+    class CalendarController <<@RestController>> {
+      - generalCalendarService : GeneralCalendarService
+      --
+      + getEvents(from, to) : ResponseEntity
+    }
+  }
+}
+
+' --- Relaciones internas ---
+AnnouncementController --> AnnouncementService
+WelfareController --> WelfareContentService
+CalendarController --> GeneralCalendarService
+
+AnnouncementService --> AnnouncementRepository
+WelfareContentService --> WelfareContentRepository
+GeneralCalendarService --> CalendarEventRepository
+
+AnnouncementRepository --> Announcement : gestiona
+WelfareContentRepository --> WelfareContent : gestiona
+CalendarEventRepository --> CalendarEvent : gestiona
+
+' --- Dependencias cross-module ---
+note right of AnnouncementService
+  Depende de:
+  • user.RoleService
+    (verifica RADICADOR_AVISOS)
+end note
+
+note right of WelfareContentService
+  Depende de:
+  • user.RoleService
+    (verifica RADICADOR_BIENESTAR)
+end note
+
+footer Nexo — Módulo content | Universidad Distrital FJC
+
+@enduml

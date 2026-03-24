@@ -1,0 +1,99 @@
+@startuml 01_Modulo_Shared
+
+' ============================================================
+' NEXO — Módulo: shared
+' Componentes transversales
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.shared" #F2F3F4 {
+
+  package "exception" {
+    class GlobalExceptionHandler <<@ControllerAdvice>> {
+      + handleResourceNotFound(ex) : ResponseEntity<ApiResponse>
+      + handleBusinessRule(ex) : ResponseEntity<ApiResponse>
+      + handleUnauthorized(ex) : ResponseEntity<ApiResponse>
+      + handleValidation(ex) : ResponseEntity<ApiResponse>
+      + handleGeneral(ex) : ResponseEntity<ApiResponse>
+    }
+
+    class ResourceNotFoundException <<RuntimeException>> {
+      - resourceName : String
+      - fieldName : String
+      - fieldValue : Object
+    }
+
+    class BusinessRuleException <<RuntimeException>> {
+      - code : String
+      - message : String
+    }
+
+    class UnauthorizedException <<RuntimeException>> {
+    }
+
+    RuntimeException <|-- ResourceNotFoundException
+    RuntimeException <|-- BusinessRuleException
+    RuntimeException <|-- UnauthorizedException
+  }
+
+  package "dto" {
+    class ApiResponse<T> <<DTO>> {
+      - success : boolean
+      - message : String
+      - timestamp : LocalDateTime
+      - data : T
+      + {static} ok(message, data) : ApiResponse
+      + {static} error(message) : ApiResponse
+    }
+
+    class PageResponse<T> <<DTO>> {
+      - content : List<T>
+      - page : int
+      - size : int
+      - totalElements : long
+      - totalPages : int
+    }
+  }
+
+  package "config" {
+    class CorsConfig <<@Configuration>> {
+      + corsConfigurer() : WebMvcConfigurer
+    }
+
+    class OpenApiConfig <<@Configuration>> {
+      + openApi() : OpenAPI
+    }
+
+    class MailConfig <<@Configuration>> {
+      + javaMailSender() : JavaMailSender
+    }
+  }
+
+  package "util" {
+    class DateUtils <<Utility>> {
+      + {static} currentSemester() : String
+      + {static} formatDateTime(dt : LocalDateTime) : String
+      + {static} now() : LocalDateTime
+    }
+  }
+}
+
+GlobalExceptionHandler ..> ApiResponse : genera
+GlobalExceptionHandler ..> ResourceNotFoundException : captura
+GlobalExceptionHandler ..> BusinessRuleException : captura
+GlobalExceptionHandler ..> UnauthorizedException : captura
+
+footer Nexo — Módulo shared | Universidad Distrital FJC
+
+@enduml

@@ -1,0 +1,174 @@
+@startuml 06_Modulo_Campus
+
+' ============================================================
+' NEXO — Módulo: campus
+' Sedes, Salones, Fotos, Desplazamiento
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.campus" #FDEDEC {
+
+  package "entity" {
+    class Campus <<@Entity>> {
+      - id : Long
+      - name : String
+      - address : String
+      - faculty : String
+      - latitude : double
+      - longitude : double
+      - mapUrl : String
+      - updatedAt : LocalDateTime
+      --
+      - classrooms : List<Classroom>  <<@OneToMany>>
+    }
+
+    class Classroom <<@Entity>> {
+      - id : Long
+      - campusId : Long  <<FK>>
+      - name : String
+      - building : String
+      - floor : String
+      - isLab : boolean
+      --
+      - photos : List<ClassroomPhoto>  <<@OneToMany>>
+    }
+
+    class ClassroomPhoto <<@Entity>> {
+      - id : Long
+      - classroomId : Long  <<FK>>
+      - photoUrl : String
+      - uploadedBy : Long  <<FK → User.id>>
+      - uploadedAt : LocalDateTime
+    }
+
+    Campus "1" --> "*" Classroom : contiene >
+    Classroom "1" --> "*" ClassroomPhoto : tiene >
+  }
+
+  package "dto" {
+    class CampusResponse <<DTO>> {
+      - id : Long
+      - name : String
+      - address : String
+      - faculty : String
+      - latitude : double
+      - longitude : double
+      - mapUrl : String
+      - classrooms : List<ClassroomResponse>
+    }
+
+    class ClassroomResponse <<DTO>> {
+      - id : Long
+      - name : String
+      - building : String
+      - floor : String
+      - isLab : boolean
+      - photos : List<String>
+    }
+
+    class TravelTimeResponse <<DTO>> {
+      - originCampusId : Long
+      - originCampusName : String
+      - destinationCampusId : Long
+      - destinationCampusName : String
+      - estimatedMinutes : int
+      - warning : boolean
+      - message : String
+    }
+
+    class UpdateCampusRequest <<DTO>> {
+      - name : String
+      - address : String
+      - latitude : double
+      - longitude : double
+      - mapUrl : String
+    }
+  }
+
+  package "repository" {
+    interface CampusRepository <<@Repository>> {
+      + findByFaculty(faculty) : List<Campus>
+      + findByNameContainingIgnoreCase(name) : Optional<Campus>
+      + findAll() : List<Campus>
+    }
+
+    interface ClassroomRepository <<@Repository>> {
+      + findByCampusId(campusId) : List<Classroom>
+      + findByCampusIdAndIsLabTrue(campusId) : List<Classroom>
+    }
+
+    interface ClassroomPhotoRepository <<@Repository>> {
+      + findByClassroomId(classroomId) : List<ClassroomPhoto>
+    }
+  }
+
+  package "service" {
+    class CampusService <<@Service>> {
+      - campusRepository : CampusRepository
+      - classroomRepository : ClassroomRepository
+      - classroomPhotoRepository : ClassroomPhotoRepository
+      --
+      + getAllCampuses() : List<CampusResponse>
+      + getCampusByFaculty(faculty) : List<CampusResponse>
+      + getCampusById(id) : CampusResponse
+      + updateCampus(id, request) : CampusResponse
+      + addClassroomPhoto(classroomId, url, uploadedBy) : void
+      + getLabs(campusId) : List<ClassroomResponse>
+    }
+
+    class TravelTimeService <<@Service>> {
+      - campusRepository : CampusRepository
+      --
+      + calculateTravelTime(originId, destId) : TravelTimeResponse
+      + isTransferInsufficient(originId, destId, minutes) : boolean
+      - haversineDistance(lat1, lon1, lat2, lon2) : double
+    }
+  }
+
+  package "controller" {
+    class CampusController <<@RestController>> {
+      - campusService : CampusService
+      - travelTimeService : TravelTimeService
+      --
+      + getAllCampuses() : ResponseEntity<List<CampusResponse>>
+      + getCampus(id) : ResponseEntity<CampusResponse>
+      + getCampusesByFaculty(faculty) : ResponseEntity<List<CampusResponse>>
+      + updateCampus(id, req) : ResponseEntity<CampusResponse>
+      + getTravelTime(originId, destId) : ResponseEntity<TravelTimeResponse>
+      + addPhoto(classroomId, url) : ResponseEntity<ApiResponse>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+CampusController --> CampusService
+CampusController --> TravelTimeService
+CampusService --> CampusRepository
+CampusService --> ClassroomRepository
+CampusService --> ClassroomPhotoRepository
+TravelTimeService --> CampusRepository
+
+CampusRepository --> Campus : gestiona
+ClassroomRepository --> Classroom : gestiona
+ClassroomPhotoRepository --> ClassroomPhoto : gestiona
+
+note bottom of ClassroomPhoto
+  Cross-module FK:
+  • uploadedBy → user.User.id
+  (Radicador de Sedes)
+end note
+
+footer Nexo — Módulo campus | Universidad Distrital FJC
+
+@enduml

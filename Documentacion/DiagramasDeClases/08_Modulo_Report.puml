@@ -1,0 +1,114 @@
+@startuml 08_Modulo_Report
+
+' ============================================================
+' NEXO — Módulo: report
+' Reportes de Errores e Inconsistencias
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.report" #FDF2E9 {
+
+  package "entity" {
+    enum ReportType <<Enum>> {
+      ERROR_HORARIO
+      CAMBIO_SALON
+      INFORMACION_INCORRECTA
+      OTRO
+    }
+
+    enum ReportStatus <<Enum>> {
+      PENDIENTE
+      EN_REVISION
+      RESUELTO
+      DESCARTADO
+    }
+
+    class Report <<@Entity>> {
+      - id : Long
+      - userId : Long  <<FK → User.id>>
+      - reportType : ReportType  <<@Enumerated>>
+      - description : String  <<@Column(length=2000)>>
+      - evidenceUrl : String  <<nullable>>
+      - status : ReportStatus  <<@Enumerated>>
+      - createdAt : LocalDateTime
+      - resolvedAt : LocalDateTime  <<nullable>>
+    }
+
+    Report --> ReportType
+    Report --> ReportStatus
+  }
+
+  package "dto" {
+    class CreateReportRequest <<DTO>> {
+      - reportType : ReportType  <<@NotNull>>
+      - description : String  <<@NotBlank>>
+      - evidenceUrl : String
+    }
+
+    class ReportResponse <<DTO>> {
+      - id : Long
+      - reportType : String
+      - description : String
+      - evidenceUrl : String
+      - status : String
+      - createdAt : LocalDateTime
+      - resolvedAt : LocalDateTime
+    }
+  }
+
+  package "repository" {
+    interface ReportRepository <<@Repository>> {
+      + findByUserId(userId) : List<Report>
+      + findByStatus(status) : List<Report>
+      + findAll() : List<Report>
+    }
+  }
+
+  package "service" {
+    class ReportService <<@Service>> {
+      - reportRepository : ReportRepository
+      --
+      + create(userId, request) : ReportResponse
+      + getByUser(userId) : List<ReportResponse>
+      + getAll() : List<ReportResponse>
+      + getByStatus(status) : List<ReportResponse>
+      + updateStatus(reportId, status) : ReportResponse
+    }
+  }
+
+  package "controller" {
+    class ReportController <<@RestController>> {
+      - reportService : ReportService
+      --
+      + createReport(req) : ResponseEntity<ReportResponse>
+      + getMyReports() : ResponseEntity<List<ReportResponse>>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+ReportController --> ReportService
+ReportService --> ReportRepository
+ReportRepository --> Report : gestiona
+
+note bottom of Report
+  Cross-module FK:
+  • userId → user.User.id
+  Reportes incluyen cambios
+  de salón con evidencia (RF-49)
+end note
+
+footer Nexo — Módulo report | Universidad Distrital FJC
+
+@enduml

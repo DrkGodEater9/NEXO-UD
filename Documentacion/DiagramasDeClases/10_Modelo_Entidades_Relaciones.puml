@@ -1,0 +1,261 @@
+@startuml 10_Modelo_Entidades_Relaciones
+
+' ============================================================
+' NEXO — Modelo de Entidades y Relaciones
+' Vista consolidada de todas las entidades del sistema
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam defaultFontName Arial
+skinparam nodesep 50
+skinparam ranksep 40
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+' --- Módulo user ---
+together {
+  class User <<user>> #E8F8F5 {
+    id : Long <<PK>>
+    email : String <<unique>>
+    nickname : String <<unique>>
+    passwordHash : String
+    active : boolean
+    createdAt : LocalDateTime
+    updatedAt : LocalDateTime
+  }
+
+  class Role <<user>> #E8F8F5 {
+    id : Long <<PK>>
+    userId : Long <<FK>>
+    roleName : RoleName
+    assignedAt : LocalDateTime
+    assignedBy : Long <<FK>>
+  }
+}
+
+' --- Módulo auth ---
+class VerificationCode <<auth>> #EBF5FB {
+  id : Long <<PK>>
+  email : String
+  code : String
+  createdAt : LocalDateTime
+  expiresAt : LocalDateTime
+  used : boolean
+  attempts : int
+}
+
+' --- Módulo academic ---
+together {
+  class AcademicOffer <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    semester : String
+    uploadedAt : LocalDateTime
+    uploadedBy : Long <<FK>>
+    active : boolean
+  }
+
+  class StudyPlan <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    code : String <<unique>>
+    name : String
+    faculty : String
+    totalCredits : int
+    version : String
+  }
+
+  class Subject <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    codeSNIES : String
+    codeInternal : String
+    name : String
+    credits : int
+    electiveType : ElectiveType
+    studyPlanId : Long <<FK>>
+    semester : int
+  }
+
+  class Prerequisite <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    subjectId : Long <<FK>>
+    prerequisiteSubjectId : Long <<FK>>
+  }
+
+  class Group <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    subjectId : Long <<FK>>
+    groupNumber : int
+    teacherName : String
+    academicOfferId : Long <<FK>>
+    campusId : Long <<FK>>
+  }
+
+  class TimeBlock <<academic>> #FEF9E7 {
+    id : Long <<PK>>
+    groupId : Long <<FK>>
+    dayOfWeek : DayOfWeek
+    startTime : LocalTime
+    endTime : LocalTime
+    classroom : String
+    campusId : Long <<FK>>
+  }
+}
+
+' --- Módulo schedule ---
+together {
+  class Schedule <<schedule>> #F5EEF8 {
+    id : Long <<PK>>
+    userId : Long <<FK>>
+    name : String
+    semester : String
+    notes : String
+    totalCredits : int
+    createdAt : LocalDateTime
+    archived : boolean
+  }
+
+  class ScheduleBlock <<schedule>> #F5EEF8 {
+    id : Long <<PK>>
+    scheduleId : Long <<FK>>
+    groupId : Long <<FK, nullable>>
+    subjectId : Long <<FK, nullable>>
+    color : String
+    manual : boolean
+    manualLabel : String
+    manualDay : DayOfWeek
+    manualStartTime : LocalTime
+    manualEndTime : LocalTime
+  }
+}
+
+' --- Módulo campus ---
+together {
+  class Campus <<campus>> #FDEDEC {
+    id : Long <<PK>>
+    name : String
+    address : String
+    faculty : String
+    latitude : double
+    longitude : double
+    mapUrl : String
+  }
+
+  class Classroom <<campus>> #FDEDEC {
+    id : Long <<PK>>
+    campusId : Long <<FK>>
+    name : String
+    building : String
+    floor : String
+    isLab : boolean
+  }
+
+  class ClassroomPhoto <<campus>> #FDEDEC {
+    id : Long <<PK>>
+    classroomId : Long <<FK>>
+    photoUrl : String
+    uploadedBy : Long <<FK>>
+    uploadedAt : LocalDateTime
+  }
+}
+
+' --- Módulo content ---
+together {
+  class Announcement <<content>> #E8F6F3 {
+    id : Long <<PK>>
+    title : String
+    body : String
+    scope : AnnouncementScope
+    type : AnnouncementType
+    faculty : String
+    createdBy : Long <<FK>>
+    createdAt : LocalDateTime
+  }
+
+  class WelfareContent <<content>> #E8F6F3 {
+    id : Long <<PK>>
+    title : String
+    description : String
+    category : WelfareCategory
+    links : String
+    createdBy : Long <<FK>>
+    createdAt : LocalDateTime
+  }
+
+  class CalendarEvent <<content>> #E8F6F3 {
+    id : Long <<PK>>
+    title : String
+    description : String
+    eventType : CalendarEventType
+    startDate : LocalDate
+    endDate : LocalDate
+    createdBy : Long <<FK>>
+  }
+}
+
+' --- Módulo report ---
+class Report <<report>> #FDF2E9 {
+  id : Long <<PK>>
+  userId : Long <<FK>>
+  reportType : ReportType
+  description : String
+  evidenceUrl : String
+  status : ReportStatus
+  createdAt : LocalDateTime
+  resolvedAt : LocalDateTime
+}
+
+' ============================================================
+' RELACIONES JPA (mismo módulo) — línea sólida
+' ============================================================
+User "1" ---> "*" Role : tiene
+
+StudyPlan "1" --> "*" Subject
+Subject "1" --> "*" Prerequisite : requiere
+Subject "1" --> "*" Group
+AcademicOffer "1" --> "*" Group
+Group "1" --> "*" TimeBlock
+
+Schedule "1" --> "*" ScheduleBlock
+
+Campus "1" --> "*" Classroom
+Classroom "1" --> "*" ClassroomPhoto
+
+' ============================================================
+' RELACIONES POR FK (cross-module) — línea punteada
+' ============================================================
+Schedule ..> User : userId
+ScheduleBlock ..> Group : groupId
+ScheduleBlock ..> Subject : subjectId
+
+Group ..> Campus : campusId
+TimeBlock ..> Campus : campusId
+
+ClassroomPhoto ..> User : uploadedBy
+AcademicOffer ..> User : uploadedBy
+
+Announcement ..> User : createdBy
+WelfareContent ..> User : createdBy
+CalendarEvent ..> User : createdBy
+Report ..> User : userId
+
+legend bottom left
+  |= Color |= Módulo |
+  |<back:#E8F8F5>    </back>| user |
+  |<back:#EBF5FB>    </back>| auth |
+  |<back:#FEF9E7>    </back>| academic |
+  |<back:#F5EEF8>    </back>| schedule |
+  |<back:#FDEDEC>    </back>| campus |
+  |<back:#E8F6F3>    </back>| content |
+  |<back:#FDF2E9>    </back>| report |
+  |= Línea |= Significado |
+  | ───── | Relación JPA (mismo módulo) |
+  | - - - | FK cross-module (sin JPA directo) |
+endlegend
+
+footer Nexo — Modelo de Entidades | Universidad Distrital FJC | Marzo 2026
+
+@enduml

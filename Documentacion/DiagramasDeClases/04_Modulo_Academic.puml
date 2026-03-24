@@ -1,0 +1,250 @@
+@startuml 04_Modulo_Academic
+
+' ============================================================
+' NEXO — Módulo: academic
+' Oferta Académica, Asignaturas, Grupos, Restricciones
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 30
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.academic" #FEF9E7 {
+
+  package "entity" {
+    enum ElectiveType <<Enum>> {
+      INTRINSECA
+      EXTRINSECA
+      NINGUNA
+    }
+
+    enum DayOfWeek <<Enum>> {
+      LUNES
+      MARTES
+      MIERCOLES
+      JUEVES
+      VIERNES
+      SABADO
+      DOMINGO
+    }
+
+    class AcademicOffer <<@Entity>> {
+      - id : Long
+      - semester : String
+      - uploadedAt : LocalDateTime
+      - uploadedBy : Long  <<FK → User.id>>
+      - active : boolean
+    }
+
+    class StudyPlan <<@Entity>> {
+      - id : Long
+      - code : String  <<unique>>
+      - name : String
+      - faculty : String
+      - totalCredits : int
+      - version : String
+    }
+
+    class Subject <<@Entity>> {
+      - id : Long
+      - codeSNIES : String
+      - codeInternal : String
+      - name : String
+      - credits : int
+      - electiveType : ElectiveType
+      - studyPlanId : Long  <<FK>>
+      - semester : int
+    }
+
+    class Prerequisite <<@Entity>> {
+      - id : Long
+      - subjectId : Long  <<FK → Subject.id>>
+      - prerequisiteSubjectId : Long  <<FK → Subject.id>>
+    }
+
+    class Group <<@Entity>> {
+      - id : Long
+      - subjectId : Long  <<FK>>
+      - groupNumber : int
+      - teacherName : String
+      - academicOfferId : Long  <<FK>>
+      - campusId : Long  <<FK → Campus.id>>
+    }
+
+    class TimeBlock <<@Entity>> {
+      - id : Long
+      - groupId : Long  <<FK>>
+      - dayOfWeek : DayOfWeek
+      - startTime : LocalTime
+      - endTime : LocalTime
+      - classroom : String
+      - campusId : Long  <<FK → Campus.id>>
+    }
+
+    ' Relaciones JPA internas
+    StudyPlan "1" --> "*" Subject : incluye >
+    AcademicOffer "1" --> "*" Group : contiene >
+    Subject "1" --> "*" Group : agrupa >
+    Subject "1" --> "*" Prerequisite : tiene >
+    Group "1" --> "*" TimeBlock : define >
+    Subject --> ElectiveType
+    TimeBlock --> DayOfWeek
+  }
+
+  package "dto" {
+    class SubjectResponse <<DTO>> {
+      - id : Long
+      - codeSNIES : String
+      - codeInternal : String
+      - name : String
+      - credits : int
+      - electiveType : String
+      - studyPlanName : String
+      - groups : List<GroupResponse>
+    }
+
+    class GroupResponse <<DTO>> {
+      - id : Long
+      - groupNumber : int
+      - teacherName : String
+      - campusName : String
+      - timeBlocks : List<TimeBlockResponse>
+    }
+
+    class TimeBlockResponse <<DTO>> {
+      - dayOfWeek : String
+      - startTime : String
+      - endTime : String
+      - classroom : String
+      - campusName : String
+    }
+
+    class AcademicSearchRequest <<DTO>> {
+      - keyword : String
+      - campusId : Long
+      - studyPlanId : Long
+      - semester : Integer
+    }
+
+    class ValidationResult <<DTO>> {
+      - valid : boolean
+      - creditExceeded : boolean
+      - prerequisitesMissing : List<String>
+      - scheduleConflict : boolean
+      - travelWarning : boolean
+      - message : String
+    }
+  }
+
+  package "repository" {
+    interface AcademicOfferRepository <<@Repository>> {
+      + findByActiveTrue() : Optional<AcademicOffer>
+      + findBySemester(semester) : Optional<AcademicOffer>
+    }
+
+    interface StudyPlanRepository <<@Repository>> {
+      + findByFaculty(faculty) : List<StudyPlan>
+      + findByCode(code) : Optional<StudyPlan>
+    }
+
+    interface SubjectRepository <<@Repository>> {
+      + findByStudyPlanId(planId) : List<Subject>
+      + findByNameContainingIgnoreCase(kw) : List<Subject>
+      + findByCodeSNIESOrCodeInternal(s, i) : Optional<Subject>
+    }
+
+    interface PrerequisiteRepository <<@Repository>> {
+      + findBySubjectId(subjectId) : List<Prerequisite>
+    }
+
+    interface GroupRepository <<@Repository>> {
+      + findBySubjectIdAndAcademicOfferId(sId, oId) : List<Group>
+      + findByCampusId(campusId) : List<Group>
+    }
+
+    interface TimeBlockRepository <<@Repository>> {
+      + findByGroupId(groupId) : List<TimeBlock>
+      + findByGroupIdIn(ids) : List<TimeBlock>
+    }
+  }
+
+  package "service" {
+    class SubjectService <<@Service>> {
+      - subjectRepository : SubjectRepository
+      - groupRepository : GroupRepository
+      - timeBlockRepository : TimeBlockRepository
+      - academicOfferRepository : AcademicOfferRepository
+      --
+      + search(request : AcademicSearchRequest) : List<SubjectResponse>
+      + getSubjectWithGroups(subjectId) : SubjectResponse
+      + getGroupTimeBlocks(groupId) : List<TimeBlockResponse>
+    }
+
+    class AcademicOfferService <<@Service>> {
+      - academicOfferRepository : AcademicOfferRepository
+      --
+      + getActiveOffer() : AcademicOffer
+      + getOfferBySemester(semester) : AcademicOffer
+    }
+
+    class RestrictionValidatorService <<@Service>> {
+      - subjectRepository : SubjectRepository
+      - prerequisiteRepository : PrerequisiteRepository
+      - timeBlockRepository : TimeBlockRepository
+      --
+      + validateAddition(blocks, newGroupId, maxCredits) : ValidationResult
+      + checkCreditLimit(current, newCredits) : boolean
+      + checkPrerequisites(subjectId, completed) : boolean
+      + checkScheduleConflict(existing, newBlocks) : boolean
+    }
+  }
+
+  package "controller" {
+    class AcademicController <<@RestController>> {
+      - subjectService : SubjectService
+      - academicOfferService : AcademicOfferService
+      --
+      + searchSubjects(request) : ResponseEntity<List<SubjectResponse>>
+      + getSubject(id) : ResponseEntity<SubjectResponse>
+      + getStudyPlans() : ResponseEntity<List<StudyPlan>>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+AcademicController --> SubjectService
+AcademicController --> AcademicOfferService
+
+SubjectService --> SubjectRepository
+SubjectService --> GroupRepository
+SubjectService --> TimeBlockRepository
+SubjectService --> AcademicOfferRepository
+
+AcademicOfferService --> AcademicOfferRepository
+
+RestrictionValidatorService --> SubjectRepository
+RestrictionValidatorService --> PrerequisiteRepository
+RestrictionValidatorService --> TimeBlockRepository
+
+' --- Referencias cross-module ---
+note bottom of Group
+  campusId → campus.Campus.id
+  (FK en BD, sin JPA directo)
+end note
+
+note bottom of TimeBlock
+  campusId → campus.Campus.id
+  (FK en BD, sin JPA directo)
+end note
+
+footer Nexo — Módulo academic | Universidad Distrital FJC
+
+@enduml

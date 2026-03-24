@@ -1,0 +1,192 @@
+@startuml 05_Modulo_Schedule
+
+' ============================================================
+' NEXO — Módulo: schedule
+' Horarios, Bloques, Histórico, Exportación
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.schedule" #F5EEF8 {
+
+  package "entity" {
+    class Schedule <<@Entity>> {
+      - id : Long
+      - userId : Long  <<FK → User.id>>
+      - name : String
+      - semester : String
+      - notes : String  <<@Column(length=2000)>>
+      - totalCredits : int
+      - createdAt : LocalDateTime
+      - updatedAt : LocalDateTime
+      - archived : boolean
+      --
+      - blocks : List<ScheduleBlock>  <<@OneToMany>>
+    }
+
+    class ScheduleBlock <<@Entity>> {
+      - id : Long
+      - scheduleId : Long  <<FK>>
+      - groupId : Long  <<FK → Group.id, nullable>>
+      - subjectId : Long  <<FK → Subject.id, nullable>>
+      - color : String
+      - manual : boolean
+      - manualLabel : String
+      - manualDay : DayOfWeek
+      - manualStartTime : LocalTime
+      - manualEndTime : LocalTime
+    }
+
+    Schedule "1" --> "*" ScheduleBlock : contiene >
+  }
+
+  package "dto" {
+    class ScheduleResponse <<DTO>> {
+      - id : Long
+      - name : String
+      - semester : String
+      - notes : String
+      - totalCredits : int
+      - blocks : List<ScheduleBlockResponse>
+      - createdAt : LocalDateTime
+    }
+
+    class ScheduleBlockResponse <<DTO>> {
+      - id : Long
+      - subjectName : String
+      - groupNumber : int
+      - color : String
+      - timeBlocks : List<TimeBlockResponse>
+      - manual : boolean
+      - manualLabel : String
+    }
+
+    class CreateScheduleRequest <<DTO>> {
+      - name : String  <<@NotBlank>>
+      - semester : String  <<@NotBlank>>
+    }
+
+    class AddBlockRequest <<DTO>> {
+      - scheduleId : Long
+      - groupId : Long
+      - subjectId : Long
+      - color : String
+    }
+
+    class AddManualBlockRequest <<DTO>> {
+      - scheduleId : Long
+      - label : String
+      - day : DayOfWeek
+      - startTime : LocalTime
+      - endTime : LocalTime
+      - color : String
+    }
+
+    class ExportRequest <<DTO>> {
+      - scheduleId : Long
+      - format : String
+    }
+  }
+
+  package "repository" {
+    interface ScheduleRepository <<@Repository>> {
+      + findByUserIdAndArchivedFalse(userId) : List<Schedule>
+      + findByUserId(userId) : List<Schedule>
+      + countByUserIdAndArchivedFalse(userId) : int
+    }
+
+    interface ScheduleBlockRepository <<@Repository>> {
+      + findByScheduleId(scheduleId) : List<ScheduleBlock>
+      + deleteByScheduleIdAndGroupId(sId, gId) : void
+    }
+  }
+
+  package "service" {
+    class ScheduleService <<@Service>> {
+      - scheduleRepository : ScheduleRepository
+      - scheduleBlockRepository : ScheduleBlockRepository
+      - restrictionValidatorService : RestrictionValidatorService
+      - subjectService : SubjectService
+      - travelTimeService : TravelTimeService
+      --
+      + createSchedule(userId, request) : ScheduleResponse
+      + getSchedules(userId) : List<ScheduleResponse>
+      + getScheduleById(scheduleId, userId) : ScheduleResponse
+      + addBlock(userId, request) : ValidationResult
+      + addManualBlock(userId, request) : ScheduleResponse
+      + removeBlock(scheduleId, blockId, userId) : void
+      + updateNotes(scheduleId, notes, userId) : ScheduleResponse
+      + deleteSchedule(scheduleId, userId) : void
+      + getHistory(userId) : List<ScheduleResponse>
+    }
+
+    class ExportService <<@Service>> {
+      - scheduleService : ScheduleService
+      --
+      + exportToPdf(scheduleId, userId) : byte[]
+      + exportToImage(scheduleId, userId) : byte[]
+    }
+  }
+
+  package "controller" {
+    class ScheduleController <<@RestController>> {
+      - scheduleService : ScheduleService
+      - exportService : ExportService
+      --
+      + createSchedule(req) : ResponseEntity<ScheduleResponse>
+      + getMySchedules() : ResponseEntity<List<ScheduleResponse>>
+      + getSchedule(id) : ResponseEntity<ScheduleResponse>
+      + addBlock(req) : ResponseEntity<ValidationResult>
+      + addManualBlock(req) : ResponseEntity<ScheduleResponse>
+      + removeBlock(scheduleId, blockId) : ResponseEntity<ApiResponse>
+      + updateNotes(scheduleId, notes) : ResponseEntity<ScheduleResponse>
+      + deleteSchedule(id) : ResponseEntity<ApiResponse>
+      + getHistory() : ResponseEntity<List<ScheduleResponse>>
+      + exportSchedule(req) : ResponseEntity<byte[]>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+ScheduleController --> ScheduleService
+ScheduleController --> ExportService
+ExportService --> ScheduleService
+ScheduleService --> ScheduleRepository
+ScheduleService --> ScheduleBlockRepository
+ScheduleRepository --> Schedule : gestiona
+ScheduleBlockRepository --> ScheduleBlock : gestiona
+
+' --- Dependencias cross-module ---
+note right of ScheduleService
+  Depende de:
+  • academic.RestrictionValidatorService
+  • academic.SubjectService
+  • campus.TravelTimeService
+end note
+
+note bottom of ScheduleBlock
+  Cross-module FK (sin JPA directo):
+  • groupId → academic.Group.id
+  • subjectId → academic.Subject.id
+end note
+
+note bottom of Schedule
+  Cross-module FK:
+  • userId → user.User.id
+  Regla: máx 5 horarios activos
+  (RF-38)
+end note
+
+footer Nexo — Módulo schedule | Universidad Distrital FJC
+
+@enduml

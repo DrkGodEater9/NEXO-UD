@@ -1,0 +1,154 @@
+@startuml 03_Modulo_User
+
+' ============================================================
+' NEXO — Módulo: user
+' Perfil, Roles, Eliminación de cuenta
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.user" #E8F8F5 {
+
+  package "entity" {
+    enum RoleName <<Enum>> {
+      ADMINISTRADOR
+      ESTUDIANTE
+      RADICADOR_AVISOS
+      RADICADOR_BIENESTAR
+      RADICADOR_SEDES
+    }
+
+    class User <<@Entity>> {
+      - id : Long  <<@Id @GeneratedValue>>
+      - email : String  <<unique>>
+      - nickname : String  <<unique>>
+      - passwordHash : String
+      - active : boolean
+      - createdAt : LocalDateTime
+      - updatedAt : LocalDateTime
+      --
+      - roles : List<Role>  <<@OneToMany>>
+    }
+
+    class Role <<@Entity>> {
+      - id : Long  <<@Id @GeneratedValue>>
+      - userId : Long  <<FK>>
+      - roleName : RoleName  <<@Enumerated>>
+      - assignedAt : LocalDateTime
+      - assignedBy : Long  <<FK → User.id>>
+    }
+
+    User "1" --> "*" Role : tiene >
+    Role --> RoleName : usa >
+  }
+
+  package "dto" {
+    class UserProfileResponse <<DTO>> {
+      - id : Long
+      - email : String
+      - nickname : String
+      - roles : List<String>
+      - createdAt : LocalDateTime
+    }
+
+    class UpdateNicknameRequest <<DTO>> {
+      - newNickname : String  <<@NotBlank>>
+    }
+
+    class AssignRoleRequest <<DTO>> {
+      - userId : Long
+      - roles : List<RoleName>
+    }
+
+    class RevokeRoleRequest <<DTO>> {
+      - userId : Long
+      - roles : List<RoleName>
+    }
+  }
+
+  package "repository" {
+    interface UserRepository <<@Repository>> {
+      + findByEmail(email) : Optional<User>
+      + findByNickname(nickname) : Optional<User>
+      + existsByEmail(email) : boolean
+      + existsByNickname(nickname) : boolean
+      + findByEmailContainingOrNicknameContaining(e, n) : List<User>
+    }
+
+    interface RoleRepository <<@Repository>> {
+      + findByUserId(userId) : List<Role>
+      + findByUserIdAndRoleName(userId, roleName) : Optional<Role>
+      + deleteByUserIdAndRoleName(userId, roleName) : void
+      + deleteAllByUserId(userId) : void
+    }
+  }
+
+  package "service" {
+    class UserService <<@Service>> {
+      - userRepository : UserRepository
+      - roleRepository : RoleRepository
+      --
+      + createUser(email, nickname, passwordHash) : User
+      + findByEmail(email) : Optional<User>
+      + findById(id) : User
+      + updateNickname(userId, newNickname) : User
+      + deleteAccount(userId) : void
+      + getUserProfile(userId) : UserProfileResponse
+      + searchUsers(query) : List<UserProfileResponse>
+    }
+
+    class RoleService <<@Service>> {
+      - roleRepository : RoleRepository
+      - userRepository : UserRepository
+      --
+      + assignRoles(userId, roles, assignedBy) : void
+      + revokeRoles(userId, roles) : void
+      + getUserRoles(userId) : List<RoleName>
+      + hasRole(userId, roleName) : boolean
+    }
+  }
+
+  package "controller" {
+    class UserController <<@RestController>> {
+      - userService : UserService
+      --
+      + getProfile() : ResponseEntity<UserProfileResponse>
+      + updateNickname(req) : ResponseEntity<UserProfileResponse>
+      + deleteAccount() : ResponseEntity<ApiResponse>
+    }
+
+    class RoleController <<@RestController>> {
+      - roleService : RoleService
+      - userService : UserService
+      --
+      + assignRoles(req) : ResponseEntity<ApiResponse>
+      + revokeRoles(req) : ResponseEntity<ApiResponse>
+      + searchStudents(query) : ResponseEntity<List<UserProfileResponse>>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+UserController --> UserService
+RoleController --> RoleService
+RoleController --> UserService
+UserService --> UserRepository
+UserService --> RoleRepository
+RoleService --> RoleRepository
+RoleService --> UserRepository
+UserRepository --> User : gestiona
+RoleRepository --> Role : gestiona
+
+footer Nexo — Módulo user | Universidad Distrital FJC
+
+@enduml

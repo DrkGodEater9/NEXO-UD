@@ -1,0 +1,151 @@
+@startuml 02_Modulo_Auth
+
+' ============================================================
+' NEXO — Módulo: auth
+' Registro, Login, JWT, Verificación por código
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.auth" #EBF5FB {
+
+  package "entity" {
+    class VerificationCode <<@Entity>> {
+      - id : Long
+      - email : String
+      - code : String
+      - createdAt : LocalDateTime
+      - expiresAt : LocalDateTime
+      - used : boolean
+      - attempts : int
+    }
+  }
+
+  package "dto" {
+    class RegisterRequest <<DTO>> {
+      - email : String  <<@Email>>
+      - nickname : String  <<@NotBlank>>
+      - password : String  <<@Size(min=8)>>
+    }
+
+    class LoginRequest <<DTO>> {
+      - email : String
+      - password : String
+    }
+
+    class VerifyCodeRequest <<DTO>> {
+      - email : String
+      - code : String
+    }
+
+    class AuthResponse <<DTO>> {
+      - token : String
+      - tokenType : String
+      - userId : Long
+      - nickname : String
+      - roles : List<String>
+    }
+  }
+
+  package "repository" {
+    interface VerificationCodeRepository <<@Repository>> {
+      + findByEmailAndUsedFalse(email) : Optional<VerificationCode>
+      + deleteByEmail(email) : void
+      + deleteByExpiresAtBefore(date) : void
+    }
+  }
+
+  package "service" {
+    class AuthService <<@Service>> {
+      - userService : UserService
+      - jwtService : JwtService
+      - verificationCodeService : VerificationCodeService
+      - passwordEncoder : PasswordEncoder
+      --
+      + register(request : RegisterRequest) : void
+      + verifyCode(request : VerifyCodeRequest) : AuthResponse
+      + login(request : LoginRequest) : AuthResponse
+    }
+
+    class JwtService <<@Service>> {
+      - secretKey : String
+      - expiration : long
+      --
+      + generateToken(user : User) : String
+      + validateToken(token : String) : boolean
+      + extractUserId(token : String) : Long
+      + extractEmail(token : String) : String
+      + extractRoles(token : String) : List<String>
+    }
+
+    class VerificationCodeService <<@Service>> {
+      - repository : VerificationCodeRepository
+      - mailSender : JavaMailSender
+      --
+      + createAndSend(email : String) : void
+      + verify(email : String, code : String) : boolean
+      + invalidate(email : String) : void
+    }
+  }
+
+  package "config" {
+    class SecurityConfig <<@Configuration>> {
+      - jwtFilter : JwtAuthenticationFilter
+      --
+      + securityFilterChain(http) : SecurityFilterChain
+      + passwordEncoder() : PasswordEncoder
+      + authenticationManager(config) : AuthenticationManager
+    }
+
+    class JwtAuthenticationFilter <<@Component>> {
+      - jwtService : JwtService
+      - userService : UserService
+      --
+      # doFilterInternal(request, response, chain) : void
+    }
+  }
+
+  package "controller" {
+    class AuthController <<@RestController>> {
+      - authService : AuthService
+      --
+      + register(request : RegisterRequest) : ResponseEntity
+      + verifyCode(request : VerifyCodeRequest) : ResponseEntity
+      + login(request : LoginRequest) : ResponseEntity
+    }
+  }
+}
+
+' --- Relaciones internas ---
+AuthController --> AuthService
+AuthService --> JwtService
+AuthService --> VerificationCodeService
+VerificationCodeService --> VerificationCodeRepository
+VerificationCodeRepository --> VerificationCode : gestiona
+JwtAuthenticationFilter --> JwtService
+SecurityConfig --> JwtAuthenticationFilter
+
+' --- Dependencias externas (otros módulos) ---
+note right of AuthService
+  Depende de:
+  • user.UserService (crear/consultar usuario)
+end note
+
+note right of JwtAuthenticationFilter
+  Depende de:
+  • user.UserService (cargar usuario por ID)
+end note
+
+footer Nexo — Módulo auth | Universidad Distrital FJC
+
+@enduml

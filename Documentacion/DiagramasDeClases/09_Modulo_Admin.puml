@@ -1,0 +1,107 @@
+@startuml 09_Modulo_Admin
+
+' ============================================================
+' NEXO — Módulo: admin
+' Carga Oferta Académica, Gestión General
+' ============================================================
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam defaultFontName Arial
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2E86C1
+  HeaderBackgroundColor #D6EAF8
+}
+
+package "co.edu.udistrital.nexo.admin" #F9EBEA {
+
+  package "dto" {
+    class LoadResultResponse <<DTO>> {
+      - totalRecords : int
+      - successCount : int
+      - warningCount : int
+      - errors : List<ValidationErrorResponse>
+      - semester : String
+      - uploadedAt : LocalDateTime
+    }
+
+    class ValidationErrorResponse <<DTO>> {
+      - row : int
+      - field : String
+      - message : String
+    }
+  }
+
+  package "service" {
+    class AcademicLoadService <<@Service>> {
+      - academicOfferRepository : AcademicOfferRepository
+      - subjectRepository : SubjectRepository
+      - groupRepository : GroupRepository
+      - timeBlockRepository : TimeBlockRepository
+      - campusRepository : CampusRepository
+      - fileValidationService : FileValidationService
+      --
+      + processFile(file : MultipartFile, uploadedBy : Long) : LoadResultResponse
+      - parseRecords(file) : List<Map<String, String>>
+      - createSubjectIfNeeded(data) : Subject
+      - createGroup(data, subject, offer) : Group
+      - createTimeBlocks(data, group) : List<TimeBlock>
+    }
+
+    class FileValidationService <<@Service>> {
+      --
+      + validateStructure(file : MultipartFile) : boolean
+      + validateFormat(file : MultipartFile) : List<ValidationErrorResponse>
+      - checkRequiredColumns(headers) : List<String>
+      - checkDataTypes(row, rowNum) : List<ValidationErrorResponse>
+    }
+  }
+
+  package "controller" {
+    class AdminController <<@RestController>> {
+      - academicLoadService : AcademicLoadService
+      - roleService : RoleService
+      - reportService : ReportService
+      - generalCalendarService : GeneralCalendarService
+      --
+      + uploadAcademicOffer(file) : ResponseEntity<LoadResultResponse>
+      + assignRoles(req) : ResponseEntity<ApiResponse>
+      + revokeRoles(req) : ResponseEntity<ApiResponse>
+      + getAllReports() : ResponseEntity<List<ReportResponse>>
+      + updateReportStatus(id, status) : ResponseEntity<ReportResponse>
+      + createCalendarEvent(req) : ResponseEntity<CalendarEventResponse>
+      + deleteCalendarEvent(id) : ResponseEntity<ApiResponse>
+      + getSecurityLogs() : ResponseEntity<List<Object>>
+    }
+  }
+}
+
+' --- Relaciones internas ---
+AdminController --> AcademicLoadService
+AcademicLoadService --> FileValidationService
+
+' --- Dependencias cross-module ---
+note right of AdminController
+  Depende de:
+  • user.RoleService (asignar/revocar roles)
+  • report.ReportService (ver/gestionar reportes)
+  • content.GeneralCalendarService (CRUD calendario)
+end note
+
+note right of AcademicLoadService
+  Depende de (repositorios de otros módulos
+  accedidos vía servicios intermedios):
+  • academic.AcademicOfferRepository
+  • academic.SubjectRepository
+  • academic.GroupRepository
+  • academic.TimeBlockRepository
+  • campus.CampusRepository
+end note
+
+footer Nexo — Módulo admin | Universidad Distrital FJC
+
+@enduml
