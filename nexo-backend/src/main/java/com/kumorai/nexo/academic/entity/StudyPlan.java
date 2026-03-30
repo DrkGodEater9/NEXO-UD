@@ -33,4 +33,9 @@ public class StudyPlan {
     @Builder.Default
     @OneToMany(mappedBy = "studyPlan", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Subject> subjects = new ArrayList<>();
+
+    // Materias del catálogo oficial del plan de estudios (con créditos, para avance académico)
+    @Builder.Default
+    @OneToMany(mappedBy = "studyPlan", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<CurriculumSubject> curriculumSubjects = new ArrayList<>();
 }

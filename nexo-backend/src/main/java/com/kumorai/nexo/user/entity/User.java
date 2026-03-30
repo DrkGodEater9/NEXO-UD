@@ -41,6 +41,11 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Role> roles = new ArrayList<>();
 
+    // Carreras del usuario (One-To-Many para soportar doble titulación)
+    @Builder.Default
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<UserAcademicProgress> academicProgressList = new ArrayList<>();
+
     @PrePersist
     private void prePersist() {
         this.createdAt = LocalDateTime.now();
