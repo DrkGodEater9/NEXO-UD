@@ -1,5 +1,7 @@
 package com.kumorai.nexo.schedule.service;
 
+import com.kumorai.nexo.academic.entity.TimeBlock;
+import com.kumorai.nexo.academic.repository.SubjectGroupRepository;
 import com.kumorai.nexo.schedule.dto.ScheduleBlockRequest;
 import com.kumorai.nexo.schedule.dto.ScheduleBlockResponse;
 import com.kumorai.nexo.schedule.dto.ScheduleRequest;
@@ -13,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
     private final ScheduleBlockRepository scheduleBlockRepository;
+    private final SubjectGroupRepository subjectGroupRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -73,6 +78,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         Schedule schedule = findOwned(scheduleId, userId);
         schedule.setArchived(archived);
         return toResponse(scheduleRepository.save(schedule));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> validateConflicts(List<Long> groupIds) {
+        List<TimeBlock> allBlocks = subjectGroupRepository.findTimeBlocksByGroupIds(groupIds);
+        List<String> conflicts = new java.util.ArrayList<>();
+        for (int i = 0; i < allBlocks.size(); i++) {
+            for (int j = i + 1; j < allBlocks.size(); j++) {
+                TimeBlock a = allBlocks.get(i);
+                TimeBlock b = allBlocks.get(j);
+                if (a.getDia() == b.getDia()
+                        && a.getHoraInicio() < b.getHoraFin()
+                        && b.getHoraInicio() < a.getHoraFin()) {
+                    conflicts.add(a.getDia() + " " + a.getHoraInicio() + "h-" + a.getHoraFin()
+                            + "h vs " + b.getHoraInicio() + "h-" + b.getHoraFin() + "h");
+                }
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("hasConflicts", !conflicts.isEmpty());
+        result.put("conflicts", conflicts);
+        return result;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

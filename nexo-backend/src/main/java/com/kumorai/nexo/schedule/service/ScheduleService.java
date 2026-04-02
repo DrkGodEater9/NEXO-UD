@@ -4,6 +4,7 @@ import com.kumorai.nexo.schedule.dto.ScheduleRequest;
 import com.kumorai.nexo.schedule.dto.ScheduleResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ScheduleService {
     List<ScheduleResponse> listByUser(Long userId);
@@ -12,4 +13,5 @@ public interface ScheduleService {
     ScheduleResponse update(Long scheduleId, Long userId, ScheduleRequest request);
     void delete(Long scheduleId, Long userId);
     ScheduleResponse setArchived(Long scheduleId, Long userId, boolean archived);
+    Map<String, Object> validateConflicts(List<Long> groupIds);
 }

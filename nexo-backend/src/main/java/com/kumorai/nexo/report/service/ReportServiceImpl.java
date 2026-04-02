@@ -53,6 +53,13 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
+    public ReportResponse getByIdAdmin(Long reportId) {
+        return toResponse(reportRepository.findById(reportId)
+                .orElseThrow(() -> NexoException.notFound("Reporte no encontrado")));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ReportResponse> listAll(ReportStatus status, ReportType reportType) {
         return reportRepository.findFiltered(status, reportType)
                 .stream().map(this::toResponse).toList();

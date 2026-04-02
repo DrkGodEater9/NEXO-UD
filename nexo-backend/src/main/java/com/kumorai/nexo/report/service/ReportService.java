@@ -14,5 +14,6 @@ public interface ReportService {
     ReportResponse create(ReportRequest request, Long userId);
     // Admin operations
     List<ReportResponse> listAll(ReportStatus status, ReportType reportType);
+    ReportResponse getByIdAdmin(Long reportId);
     ReportResponse updateStatus(Long reportId, UpdateReportStatusRequest request);
 }

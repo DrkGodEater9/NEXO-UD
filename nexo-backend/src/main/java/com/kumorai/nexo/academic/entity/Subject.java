@@ -33,8 +33,4 @@ public class Subject {
     @Builder.Default
     @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SubjectGroup> grupos = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Prerequisite> prerequisites = new ArrayList<>();
 }
