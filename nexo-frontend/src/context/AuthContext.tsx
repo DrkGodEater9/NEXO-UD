@@ -19,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { nickname: string; email: string; password: string; studentCode: string; entrySemester: string; studyPlanId: number }) => Promise<void>;
+  register: (data: { nickname: string; email: string; password: string; studentCode: string }) => Promise<void>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: { nickname: string; email: string; password: string; studentCode: string; entrySemester: string; studyPlanId: number }): Promise<void> => {
+  const register = async (data: { nickname: string; email: string; password: string; studentCode: string }): Promise<void> => {
     await authApi.register(data);
   };
 

@@ -57,8 +57,6 @@ export const authApi = {
     nickname: string;
     password: string;
     studentCode: string;
-    entrySemester: string;
-    studyPlanId: number;
   }) {
     return request<void>('/auth/register', {
       method: 'POST',

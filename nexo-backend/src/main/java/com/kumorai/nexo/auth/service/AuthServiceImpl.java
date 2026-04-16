@@ -63,15 +63,38 @@ public class AuthServiceImpl implements AuthService {
             throw NexoException.conflict("El código estudiantil ya está registrado");
         }
 
-        StudyPlan studyPlan = studyPlanRepository.findById(request.studyPlanId())
-                .orElseThrow(() -> NexoException.badRequest("La carrera seleccionada no existe"));
+        // Parse the 11-digit student code:
+        // [0-3] = year, [4] = semester flag (1 or 3), [5-7] = curriculum code, [8-10] = list number
+        String code = request.studentCode();
+        if (code.length() != 11 || !code.matches("\\d{11}")) {
+            throw NexoException.badRequest("El código estudiantil debe tener exactamente 11 dígitos numéricos");
+        }
+
+        int year = Integer.parseInt(code.substring(0, 4));
+        char semesterFlag = code.charAt(4);
+        String curriculumCode = code.substring(5, 8);
+        int listNumber = Integer.parseInt(code.substring(8, 11));
+
+        if (semesterFlag != '1' && semesterFlag != '3') {
+            throw NexoException.badRequest("El quinto dígito del código debe ser 1 o 3");
+        }
+        if (listNumber <= 0 || listNumber >= 300) {
+            throw NexoException.badRequest("Los últimos 3 dígitos deben estar entre 001 y 299");
+        }
+
+        String entrySemester = year + "-" + (semesterFlag == '1' ? "1" : "2");
+
+        // Look up StudyPlan by curriculum code
+        StudyPlan studyPlan = studyPlanRepository.findByCodigoPlan(curriculumCode)
+                .orElseThrow(() -> NexoException.badRequest(
+                        "No se encontró un proyecto curricular con el código " + curriculumCode));
 
         User user = User.builder()
                 .email(request.email())
                 .nickname(request.nickname())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .studentCode(request.studentCode())
-                .entrySemester(request.entrySemester())
+                .entrySemester(entrySemester)
                 .active(false)
                 .build();
         userRepository.save(user);

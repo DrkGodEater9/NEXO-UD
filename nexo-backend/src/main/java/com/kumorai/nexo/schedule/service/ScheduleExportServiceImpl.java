@@ -94,7 +94,7 @@ public class ScheduleExportServiceImpl implements ScheduleExportService {
         g.fillRect(0, 0, IMG_W, IMG_H);
 
         // Day headers
-        g.setFont(new Font("SansSerif", Font.BOLD, 13));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 13));
         for (int d = 0; d < DAY_LABELS.length; d++) {
             int x = HOUR_COL_W + d * DAY_COL_W;
             g.setColor(new Color(0x3C5DA8));
@@ -117,7 +117,7 @@ public class ScheduleExportServiceImpl implements ScheduleExportService {
         }
 
         // Hour labels
-        g.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
         g.setColor(new Color(0x666666));
         for (int h = START_HOUR; h < END_HOUR; h++) {
             int y = HEADER_H + (h - START_HOUR) * HOUR_ROW_H;
@@ -141,7 +141,7 @@ public class ScheduleExportServiceImpl implements ScheduleExportService {
             g.drawRoundRect(x, y, w, h, 8, 8);
 
             g.setColor(Color.WHITE);
-            g.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 10));
             drawWrappedText(g, slot.label(), x + 5, y + 14, w - 10, h - 8);
         }
 
@@ -159,12 +159,12 @@ public class ScheduleExportServiceImpl implements ScheduleExportService {
 
     private byte[] renderPdf(ScheduleResponse schedule, byte[] imageBytes) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document doc = new Document(new Rectangle(IMG_W + 40, IMG_H + 80),
+            Document doc = new Document(new com.lowagie.text.Rectangle(IMG_W + 40, IMG_H + 80),
                     20, 20, 20, 20);
             PdfWriter.getInstance(doc, baos);
             doc.open();
 
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
+            com.lowagie.text.Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
             Paragraph title = new Paragraph(schedule.name() + "  —  " + schedule.semester(), titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             title.setSpacingAfter(10);

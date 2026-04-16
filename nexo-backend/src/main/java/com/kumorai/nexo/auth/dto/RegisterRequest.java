@@ -2,7 +2,6 @@ package com.kumorai.nexo.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -20,13 +19,6 @@ public record RegisterRequest(
         String password,
 
         @NotBlank
-        @Pattern(regexp = "\\d{11}", message = "El código estudiantil debe tener 11 dígitos")
-        String studentCode,
-
-        @NotBlank
-        @Pattern(regexp = "\\d{4}-(1|2)", message = "El semestre debe tener el formato YYYY-1 o YYYY-2")
-        String entrySemester,
-
-        @NotNull
-        Long studyPlanId
+        @Pattern(regexp = "\\d{11}", message = "El código estudiantil debe tener exactamente 11 dígitos numéricos")
+        String studentCode
 ) {}
