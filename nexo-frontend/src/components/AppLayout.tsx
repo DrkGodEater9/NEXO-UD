@@ -62,8 +62,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     navigate('/');
   };
 
-  const initials = user?.nombre
-    ? user.nombre.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
+  const initials = user?.nickname
+    ? user.nickname.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
     : 'UD';
 
   const isActive = (path: string) => location.pathname === path;
@@ -132,10 +132,10 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
             <div className="min-w-0">
               <p style={{ color: textMain, fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.nombre.split(' ')[0]} {user.nombre.split(' ')[1] || ''}
+                {user.nickname.split(' ')[0]} {user.nickname.split(' ')[1] || ''}
               </p>
               <p style={{ color: textMuted, fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.correo}
+                {user.email}
               </p>
             </div>
           </div>
@@ -280,8 +280,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               {initials}
             </div>
             <div className="min-w-0">
-              <p style={{ color: textMain, fontWeight: 600, fontSize: '13px' }}>{user.nombre.split(' ').slice(0, 2).join(' ')}</p>
-              <p style={{ color: textMuted, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.correo}</p>
+              <p style={{ color: textMain, fontWeight: 600, fontSize: '13px' }}>{user.nickname.split(' ').slice(0, 2).join(' ')}</p>
+              <p style={{ color: textMuted, fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</p>
             </div>
           </div>
         )}

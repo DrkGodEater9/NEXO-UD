@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+nexo-frontend/node_modules/
+
+# Build outputs
+nexo-frontend/build/
+nexo-frontend/dist/
+
+# Environment files
+nexo-frontend/.env.local
+nexo-frontend/.env.*.local
+
+# Java / Maven
+nexo-backend/target/
+*.class
+*.jar
+*.war
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

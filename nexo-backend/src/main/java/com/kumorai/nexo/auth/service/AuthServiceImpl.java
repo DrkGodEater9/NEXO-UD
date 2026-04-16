@@ -1,5 +1,7 @@
 package com.kumorai.nexo.auth.service;
 
+import com.kumorai.nexo.academic.entity.StudyPlan;
+import com.kumorai.nexo.academic.repository.StudyPlanRepository;
 import com.kumorai.nexo.auth.dto.LoginRequest;
 import com.kumorai.nexo.auth.dto.LoginResponse;
 import com.kumorai.nexo.auth.dto.RegisterRequest;
@@ -13,7 +15,9 @@ import com.kumorai.nexo.shared.util.JwtService;
 import com.kumorai.nexo.user.entity.Role;
 import com.kumorai.nexo.user.entity.RoleName;
 import com.kumorai.nexo.user.entity.User;
+import com.kumorai.nexo.user.entity.UserAcademicProgress;
 import com.kumorai.nexo.user.repository.RoleRepository;
+import com.kumorai.nexo.user.repository.UserAcademicProgressRepository;
 import com.kumorai.nexo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +36,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final VerificationCodeRepository verificationCodeRepository;
+    private final UserAcademicProgressRepository academicProgressRepository;
+    private final StudyPlanRepository studyPlanRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
@@ -53,11 +59,19 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByNickname(request.nickname())) {
             throw NexoException.conflict("El apodo ya está en uso");
         }
+        if (userRepository.existsByStudentCode(request.studentCode())) {
+            throw NexoException.conflict("El código estudiantil ya está registrado");
+        }
+
+        StudyPlan studyPlan = studyPlanRepository.findById(request.studyPlanId())
+                .orElseThrow(() -> NexoException.badRequest("La carrera seleccionada no existe"));
 
         User user = User.builder()
                 .email(request.email())
                 .nickname(request.nickname())
                 .passwordHash(passwordEncoder.encode(request.password()))
+                .studentCode(request.studentCode())
+                .entrySemester(request.entrySemester())
                 .active(false)
                 .build();
         userRepository.save(user);
@@ -67,6 +81,12 @@ public class AuthServiceImpl implements AuthService {
                 .user(user)
                 .build();
         roleRepository.save(role);
+
+        UserAcademicProgress progress = UserAcademicProgress.builder()
+                .user(user)
+                .studyPlan(studyPlan)
+                .build();
+        academicProgressRepository.save(progress);
 
         issueAndSendCode(request.email(), CodePurpose.VERIFICATION);
     }

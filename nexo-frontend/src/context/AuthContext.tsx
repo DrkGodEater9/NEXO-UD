@@ -1,123 +1,167 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { initializeTestData } from '../data/testData';
+import { authApi, userApi, ApiError } from '../services/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface User {
-  id: string;
-  nombre: string;
-  codigo: string;
-  correo: string;
+  id: number;
+  email: string;
+  nickname: string;
+  roles: string[];
+  active: boolean;
+  createdAt: string;
+  // Datos locales persistidos en localStorage (no están en el backend)
   materiasVistas: string[];
-  horariosGuardados: {
-    id: string;
-    nombre: string;
-    fecha: string;
-    materias: any[];
-  }[];
+  horariosGuardados: any[];
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (correo: string, password: string) => boolean;
-  register: (data: { nombre: string; codigo: string; correo: string; password: string }) => boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: { nickname: string; email: string; password: string; studentCode: string; entrySemester: string; studyPlanId: number }) => Promise<void>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
-  isAuthenticated: boolean;
 }
+
+// ─── Local data helpers ───────────────────────────────────────────────────────
+
+function loadLocalData(email: string): { materiasVistas: string[]; horariosGuardados: any[] } {
+  try {
+    const raw = localStorage.getItem('nexoud_local_data');
+    if (!raw) return { materiasVistas: [], horariosGuardados: [] };
+    const all = JSON.parse(raw);
+    return all[email] ?? { materiasVistas: [], horariosGuardados: [] };
+  } catch {
+    return { materiasVistas: [], horariosGuardados: [] };
+  }
+}
+
+function saveLocalData(email: string, data: { materiasVistas: string[]; horariosGuardados: any[] }) {
+  try {
+    const raw = localStorage.getItem('nexoud_local_data');
+    const all = raw ? JSON.parse(raw) : {};
+    all[email] = data;
+    localStorage.setItem('nexoud_local_data', JSON.stringify(all));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
+  // Restore session on mount
   useEffect(() => {
-    // Inicializar datos de prueba
-    initializeTestData();
-    
-    const storedUser = localStorage.getItem('nexoud_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const token = localStorage.getItem('nexoud_token');
+    const stored = localStorage.getItem('nexoud_user');
+    if (token && stored) {
+      try {
+        const parsed: User = JSON.parse(stored);
+        const localData = loadLocalData(parsed.email);
+        setUser({ ...parsed, ...localData });
+
+        // Refresh profile silently in background
+        userApi.me().then(profile => {
+          const refreshed: User = {
+            ...parsed,
+            ...localData,
+            id: profile.id,
+            nickname: profile.nickname,
+            active: profile.active,
+            createdAt: profile.createdAt,
+            roles: profile.roles,
+          };
+          setUser(refreshed);
+          localStorage.setItem('nexoud_user', JSON.stringify(refreshed));
+        }).catch(() => {
+          // Token might be expired — clear session
+          localStorage.removeItem('nexoud_token');
+          localStorage.removeItem('nexoud_user');
+          setUser(null);
+        });
+      } catch {
+        localStorage.removeItem('nexoud_token');
+        localStorage.removeItem('nexoud_user');
+      }
     }
   }, []);
 
-  const login = (correoOrCodigo: string, password: string): boolean => {
-    const users = JSON.parse(localStorage.getItem('nexoud_users') || '[]');
-    const foundUser = users.find(
-      (u: any) =>
-        (u.correo === correoOrCodigo || u.codigo === correoOrCodigo) &&
-        u.password === password
-    );
+  const login = async (email: string, password: string): Promise<void> => {
+    const data = await authApi.login({ email, password });
+    localStorage.setItem('nexoud_token', data.token);
 
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('nexoud_user', JSON.stringify(userWithoutPassword));
-      return true;
-    }
-    return false;
-  };
-
-  const register = (data: { nombre: string; codigo: string; correo: string; password: string }): boolean => {
-    const users = JSON.parse(localStorage.getItem('nexoud_users') || '[]');
-    
-    // Verificar si el correo o código ya existe
-    const exists = users.find((u: any) => u.correo === data.correo || u.codigo === data.codigo);
-    if (exists) {
-      return false;
-    }
-
-    const newUser = {
-      id: Date.now().toString(),
-      ...data,
-      materiasVistas: [],
-      horariosGuardados: []
+    const localData = loadLocalData(data.email);
+    const baseUser: User = {
+      id: 0,
+      email: data.email,
+      nickname: data.nickname,
+      roles: data.roles,
+      active: true,
+      createdAt: '',
+      ...localData,
     };
+    setUser(baseUser);
+    localStorage.setItem('nexoud_user', JSON.stringify(baseUser));
 
-    users.push(newUser);
-    localStorage.setItem('nexoud_users', JSON.stringify(users));
-    return true;
+    // Enrich with full profile
+    try {
+      const profile = await userApi.me();
+      const fullUser: User = {
+        ...baseUser,
+        id: profile.id,
+        active: profile.active,
+        createdAt: profile.createdAt,
+      };
+      setUser(fullUser);
+      localStorage.setItem('nexoud_user', JSON.stringify(fullUser));
+    } catch {
+      // Non-fatal: we already have the basic user
+    }
   };
 
-  const logout = () => {
+  const register = async (data: { nickname: string; email: string; password: string; studentCode: string; entrySemester: string; studyPlanId: number }): Promise<void> => {
+    await authApi.register(data);
+  };
+
+  const logout = (): void => {
+    authApi.logout().catch(() => {});
     setUser(null);
+    localStorage.removeItem('nexoud_token');
     localStorage.removeItem('nexoud_user');
   };
 
-  const updateUser = (updates: Partial<User>) => {
+  const updateUser = (updates: Partial<User>): void => {
     if (!user) return;
+    const updated: User = { ...user, ...updates };
+    setUser(updated);
+    localStorage.setItem('nexoud_user', JSON.stringify(updated));
 
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    localStorage.setItem('nexoud_user', JSON.stringify(updatedUser));
-
-    // También actualizar en la lista de usuarios
-    const users = JSON.parse(localStorage.getItem('nexoud_users') || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex] = { ...users[userIndex], ...updates };
-      localStorage.setItem('nexoud_users', JSON.stringify(users));
+    const localChanged =
+      updates.materiasVistas !== undefined || updates.horariosGuardados !== undefined;
+    if (localChanged) {
+      saveLocalData(user.email, {
+        materiasVistas: updated.materiasVistas,
+        horariosGuardados: updated.horariosGuardados,
+      });
     }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        register,
-        logout,
-        updateUser,
-        isAuthenticated: !!user,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }
+
+export { ApiError };

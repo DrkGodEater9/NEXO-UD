@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/DrkGodEater/Documents/Proyectos/NEXO-UD/nexo-backend/src -type f -name \"*Controller.java\" -exec grep -l \"RequestMapping\\\\|PostMapping\\\\|GetMapping\" {} \\\\;)"
+    ]
+  }
+}

@@ -15,6 +15,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByNickname(String nickname);
 
+    boolean existsByStudentCode(String studentCode);
+
     // Listado paginado para el administrador (DS-11)
     Page<User> findByEmailContainingIgnoreCase(String email, Pageable pageable);
 }

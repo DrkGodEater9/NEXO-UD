@@ -52,8 +52,8 @@ export default function ProfilePage() {
   const creditosAprobados = getTotalCreditos(user.materiasVistas || []);
   const porcentajeAvance = Math.round((creditosAprobados / totalCreditosPensum) * 100);
 
-  const initials = user.nombre
-    .split(' ')
+  const initials = user.nickname
+    .split(/\s+/)
     .slice(0, 2)
     .map((n: string) => n[0])
     .join('')
@@ -103,20 +103,18 @@ export default function ProfilePage() {
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <h1 style={{ color: T.text, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em', marginBottom: '6px' }}>{user.nombre}</h1>
+              <h1 style={{ color: T.text, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em', marginBottom: '6px' }}>{user.nickname}</h1>
               <div className="flex flex-wrap gap-3">
                 <span className="px-3 py-1 rounded-full"
                   style={{ background: T.accentIndigo.bg, border: `1px solid ${T.accentIndigo.border}`, color: T.accentIndigo.color, fontSize: '12px', fontWeight: 500 }}>
-                  {user.correo}
+                  {user.email}
                 </span>
-                <span className="px-3 py-1 rounded-full font-mono-num"
-                  style={{ background: T.accentRed.bg, border: `1px solid ${T.accentRed.border}`, color: T.accentRed.color, fontSize: '12px', fontWeight: 500, fontFamily: 'JetBrains Mono, monospace' }}>
-                  {user.codigo}
-                </span>
-                <span className="px-3 py-1 rounded-full"
-                  style={{ background: T.accentGreen.bg, border: `1px solid ${T.accentGreen.border}`, color: T.accentGreen.color, fontSize: '12px', fontWeight: 500 }}>
-                  Ing. de Sistemas
-                </span>
+                {user.roles.map(role => (
+                  <span key={role} className="px-3 py-1 rounded-full"
+                    style={{ background: T.accentGreen.bg, border: `1px solid ${T.accentGreen.border}`, color: T.accentGreen.color, fontSize: '12px', fontWeight: 500 }}>
+                    {role}
+                  </span>
+                ))}
               </div>
             </div>
 

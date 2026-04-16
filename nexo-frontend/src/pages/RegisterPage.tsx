@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, ApiError } from '../context/AuthContext';
 import { useThemeTokens } from '../context/useThemeTokens';
-import { User, Hash, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, Sun, Moon } from 'lucide-react';
+import { studyPlanApi, StudyPlanSimple } from '../services/api';
+import { User, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, Sun, Moon, Hash, BookOpen, GraduationCap, Calendar } from 'lucide-react';
 
 function PasswordStrength({ password, T }: { password: string; T: ReturnType<typeof useThemeTokens> }) {
   const checks = [
-    password.length >= 6, password.length >= 10,
+    password.length >= 8, password.length >= 12,
     /[A-Z]/.test(password), /[0-9]/.test(password), /[^A-Za-z0-9]/.test(password),
   ];
   const strength = checks.filter(Boolean).length;
@@ -16,7 +17,7 @@ function PasswordStrength({ password, T }: { password: string; T: ReturnType<typ
   return (
     <div className="mt-2">
       <div className="flex gap-1 mb-1.5">
-        {[1,2,3,4,5].map(i => (
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
             style={{ background: i <= strength ? colors[strength] : T.strengthBarInactive }} />
         ))}
@@ -26,27 +27,64 @@ function PasswordStrength({ password, T }: { password: string; T: ReturnType<typ
   );
 }
 
+function generateSemesters(): string[] {
+  const semesters: string[] = [];
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear; y >= 2010; y--) {
+    semesters.push(`${y}-2`);
+    semesters.push(`${y}-1`);
+  }
+  return semesters;
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const T = useThemeTokens();
-  const [formData, setFormData] = useState({ nombre: '', codigo: '', correo: '', password: '', confirmPassword: '', terms: false });
+
+  const [formData, setFormData] = useState({
+    nickname: '',
+    correo: '',
+    studentCode: '',
+    entrySemester: '',
+    faculty: '',
+    studyPlanId: 0,
+    password: '',
+    confirmPassword: '',
+    terms: false,
+  });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [studyPlans, setStudyPlans] = useState<StudyPlanSimple[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    studyPlanApi.list()
+      .then(setStudyPlans)
+      .catch(() => setStudyPlans([]))
+      .finally(() => setLoadingPlans(false));
+  }, []);
+
+  const faculties = [...new Set(studyPlans.map(p => p.facultad))].sort();
+  const careersForFaculty = studyPlans.filter(p => p.facultad === formData.faculty);
+  const semesters = generateSemesters();
 
   const emailValid = formData.correo.endsWith('@udistrital.edu.co');
   const emailDirty = formData.correo.length > 0;
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
 
   const validateForm = (): string | null => {
-    if (!formData.nombre || !formData.codigo || !formData.correo || !formData.password || !formData.confirmPassword)
+    if (!formData.nickname || !formData.correo || !formData.studentCode || !formData.entrySemester || !formData.faculty || !formData.studyPlanId || !formData.password || !formData.confirmPassword)
       return 'Por favor completa todos los campos';
-    if (formData.nombre.length < 3) return 'El nombre debe tener al menos 3 caracteres';
-    if (!/^\d{11}$/.test(formData.codigo)) return 'El código estudiantil debe tener 11 dígitos';
+    if (formData.nickname.trim().length < 3) return 'El apodo debe tener al menos 3 caracteres';
     if (!emailValid) return 'Debes usar tu correo institucional (@udistrital.edu.co)';
-    if (formData.password.length < 6) return 'La contraseña debe tener al menos 6 caracteres';
+    if (!/^\d{11}$/.test(formData.studentCode)) return 'El código estudiantil debe tener exactamente 11 dígitos';
+    if (!formData.studyPlanId) return 'Selecciona tu carrera';
+    if (formData.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
     if (formData.password !== formData.confirmPassword) return 'Las contraseñas no coinciden';
     if (!formData.terms) return 'Debes aceptar los términos y condiciones';
     return null;
@@ -55,24 +93,47 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
     const err = validateForm();
-    if (err) { setError(err); setLoading(false); return; }
-    const success = register({ nombre: formData.nombre, codigo: formData.codigo, correo: formData.correo, password: formData.password });
-    if (success) {
-      localStorage.setItem('pending_verification', JSON.stringify({ correo: formData.correo, codigo: formData.codigo }));
+    if (err) { setError(err); return; }
+    setLoading(true);
+    try {
+      await register({
+        nickname: formData.nickname.trim(),
+        email: formData.correo,
+        password: formData.password,
+        studentCode: formData.studentCode,
+        entrySemester: formData.entrySemester,
+        studyPlanId: formData.studyPlanId,
+      });
+      localStorage.setItem('pending_verification', JSON.stringify({ email: formData.correo }));
       navigate('/verify-email');
-    } else {
-      setError('Este correo o código ya está registrado');
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo crear la cuenta. Intenta de nuevo.'
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const iStyle = { background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '14px' };
-  const ifocus = (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = T.inputFocusBorder; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.inputFocusShadow}`; };
-  const iblur = (e: React.FocusEvent<HTMLInputElement>) => { e.currentTarget.style.borderColor = T.inputBorder; e.currentTarget.style.boxShadow = 'none'; };
+  const ifocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.currentTarget.style.borderColor = T.inputFocusBorder; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.inputFocusShadow}`; };
+  const iblur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => { e.currentTarget.style.borderColor = T.inputBorder; e.currentTarget.style.boxShadow = 'none'; };
 
   const emailBorderColor = emailDirty ? (emailValid ? T.accentGreen.color : T.error.text) : T.inputBorder;
+
+  const selectStyle = {
+    ...iStyle,
+    width: '100%',
+    padding: '12px 14px 12px 40px',
+    borderRadius: '12px',
+    outline: 'none',
+    appearance: 'none' as const,
+    WebkitAppearance: 'none' as const,
+    cursor: 'pointer',
+  };
 
   return (
     <div
@@ -99,7 +160,7 @@ export default function RegisterPage() {
         </div>
       )}
 
-      <div className="w-full max-w-[460px] relative">
+      <div className="w-full max-w-[480px] relative">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 mb-8 transition-all"
           style={{ color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}
           onMouseEnter={e => e.currentTarget.style.color = T.text}
@@ -131,29 +192,17 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nombre */}
-            <div>
-              <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Nombre completo</label>
-              <div className="relative">
-                <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
-                <input type="text" value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                  placeholder="Juan Pérez González" className="w-full py-3 pl-10 pr-4 rounded-xl outline-none transition-all"
-                  style={iStyle} onFocus={ifocus} onBlur={iblur} />
-              </div>
-            </div>
-
-            {/* Código */}
+            {/* Apodo / Nickname */}
             <div>
               <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>
-                Código estudiantil <span style={{ color: T.textSubtle, fontWeight: 400 }}>(11 dígitos)</span>
+                Apodo <span style={{ color: T.textSubtle, fontWeight: 400 }}>(se mostrará en la app)</span>
               </label>
               <div className="relative">
-                <Hash size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
-                <input type="text" value={formData.codigo}
-                  onChange={e => setFormData({ ...formData, codigo: e.target.value.replace(/\D/g, '').slice(0, 11) })}
-                  placeholder="20211020XXX" maxLength={11}
-                  className="w-full py-3 pl-10 pr-4 rounded-xl outline-none transition-all font-mono-num"
-                  style={{ ...iStyle, fontFamily: 'JetBrains Mono, monospace' }} onFocus={ifocus} onBlur={iblur} />
+                <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
+                <input type="text" value={formData.nickname}
+                  onChange={e => setFormData({ ...formData, nickname: e.target.value })}
+                  placeholder="JuanP" className="w-full py-3 pl-10 pr-4 rounded-xl outline-none transition-all"
+                  style={iStyle} onFocus={ifocus} onBlur={iblur} />
               </div>
             </div>
 
@@ -162,7 +211,8 @@ export default function RegisterPage() {
               <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Correo institucional</label>
               <div className="relative">
                 <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
-                <input type="email" value={formData.correo} onChange={e => setFormData({ ...formData, correo: e.target.value })}
+                <input type="email" value={formData.correo}
+                  onChange={e => setFormData({ ...formData, correo: e.target.value })}
                   placeholder="tucorreo@udistrital.edu.co"
                   className="w-full py-3 pl-10 pr-10 rounded-xl outline-none transition-all"
                   style={{ ...iStyle, borderColor: emailBorderColor }}
@@ -170,13 +220,102 @@ export default function RegisterPage() {
                   onBlur={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = emailBorderColor; }} />
                 {emailDirty && (
                   <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)' }}>
-                    {emailValid ? <CheckCircle size={16} style={{ color: T.accentGreen.color }} /> : <AlertCircle size={16} style={{ color: T.error.text }} />}
+                    {emailValid
+                      ? <CheckCircle size={16} style={{ color: T.accentGreen.color }} />
+                      : <AlertCircle size={16} style={{ color: T.error.text }} />}
                   </div>
                 )}
               </div>
               {emailDirty && !emailValid && (
                 <p style={{ color: T.error.text, fontSize: '11px', marginTop: '6px' }}>Solo se aceptan correos @udistrital.edu.co</p>
               )}
+            </div>
+
+            {/* Código estudiantil */}
+            <div>
+              <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Código estudiantil</label>
+              <div className="relative">
+                <Hash size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.studentCode}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                    setFormData({ ...formData, studentCode: val });
+                  }}
+                  placeholder="20201515042"
+                  className="w-full py-3 pl-10 pr-4 rounded-xl outline-none transition-all"
+                  style={{ ...iStyle, borderColor: formData.studentCode ? (formData.studentCode.length === 11 ? T.accentGreen.color : T.error.text) : T.inputBorder }}
+                  onFocus={ifocus}
+                  onBlur={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = formData.studentCode ? (formData.studentCode.length === 11 ? T.accentGreen.color : T.error.text) : T.inputBorder; }}
+                />
+              </div>
+              {formData.studentCode && formData.studentCode.length !== 11 && (
+                <p style={{ color: T.error.text, fontSize: '11px', marginTop: '6px' }}>El código debe tener 11 dígitos ({formData.studentCode.length}/11)</p>
+              )}
+            </div>
+
+            {/* Semestre de ingreso */}
+            <div>
+              <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Semestre de ingreso</label>
+              <div className="relative">
+                <Calendar size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon, zIndex: 1, pointerEvents: 'none' }} />
+                <select
+                  value={formData.entrySemester}
+                  onChange={e => setFormData({ ...formData, entrySemester: e.target.value })}
+                  style={selectStyle}
+                  onFocus={ifocus}
+                  onBlur={iblur}
+                >
+                  <option value="">Selecciona el semestre</option>
+                  {semesters.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Facultad */}
+            <div>
+              <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Facultad</label>
+              <div className="relative">
+                <BookOpen size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon, zIndex: 1, pointerEvents: 'none' }} />
+                <select
+                  value={formData.faculty}
+                  onChange={e => setFormData({ ...formData, faculty: e.target.value, studyPlanId: 0 })}
+                  disabled={loadingPlans}
+                  style={{ ...selectStyle, opacity: loadingPlans ? 0.6 : 1 }}
+                  onFocus={ifocus}
+                  onBlur={iblur}
+                >
+                  <option value="">{loadingPlans ? 'Cargando facultades...' : 'Selecciona tu facultad'}</option>
+                  {faculties.map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Carrera */}
+            <div>
+              <label className="block mb-2" style={{ color: T.textMuted, fontSize: '13px', fontWeight: 500 }}>Carrera</label>
+              <div className="relative">
+                <GraduationCap size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon, zIndex: 1, pointerEvents: 'none' }} />
+                <select
+                  value={formData.studyPlanId}
+                  onChange={e => setFormData({ ...formData, studyPlanId: Number(e.target.value) })}
+                  disabled={!formData.faculty || loadingPlans}
+                  style={{ ...selectStyle, opacity: !formData.faculty ? 0.6 : 1 }}
+                  onFocus={ifocus}
+                  onBlur={iblur}
+                >
+                  <option value={0}>{!formData.faculty ? 'Primero selecciona una facultad' : 'Selecciona tu carrera'}</option>
+                  {careersForFaculty.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Contraseña */}
@@ -186,7 +325,7 @@ export default function RegisterPage() {
                 <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
                 <input type={showPassword ? 'text' : 'password'} value={formData.password}
                   onChange={e => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••" className="w-full py-3 pl-10 pr-12 rounded-xl outline-none transition-all"
+                  placeholder="Mínimo 8 caracteres" className="w-full py-3 pl-10 pr-12 rounded-xl outline-none transition-all"
                   style={iStyle} onFocus={ifocus} onBlur={iblur} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon, background: 'none', border: 'none', cursor: 'pointer' }}>

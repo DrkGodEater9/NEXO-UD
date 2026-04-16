@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useThemeTokens } from '../context/useThemeTokens';
+import { authApi } from '../services/api';
+import { ApiError } from '../context/AuthContext';
 import { Mail, CheckCircle, AlertCircle, ArrowLeft, RefreshCw, Sun, Moon } from 'lucide-react';
 
 export default function VerifyEmailPage() {
@@ -9,12 +11,11 @@ export default function VerifyEmailPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pendingData, setPendingData] = useState<any>(null);
+  const [pendingData, setPendingData] = useState<{ email: string } | null>(null);
   const [countdown, setCountdown] = useState(45);
   const [canResend, setCanResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const correctCode = '123456';
 
   useEffect(() => {
     const pending = localStorage.getItem('pending_verification');
@@ -37,11 +38,9 @@ export default function VerifyEmailPage() {
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) return;
     if (!/^\d*$/.test(value)) return;
-
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
-
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -55,9 +54,9 @@ export default function VerifyEmailPage() {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pastedData) return;
-    const newCode = pastedData.split('').concat(Array(6).fill('')).slice(0, 6);
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+    const newCode = pasted.split('').concat(Array(6).fill('')).slice(0, 6);
     setCode(newCode);
     const nextEmpty = newCode.findIndex(d => !d);
     if (nextEmpty >= 0) inputRefs.current[nextEmpty]?.focus();
@@ -67,39 +66,45 @@ export default function VerifyEmailPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
-
     const enteredCode = code.join('');
     if (enteredCode.length !== 6) {
       setError('Por favor ingresa el código completo');
-      setLoading(false);
       return;
     }
-
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    if (enteredCode === correctCode) {
+    if (!pendingData?.email) return;
+    setLoading(true);
+    try {
+      await authApi.verifyCode({ email: pendingData.email, code: enteredCode });
       setSuccess(true);
       localStorage.removeItem('pending_verification');
       setTimeout(() => navigate('/login'), 2500);
-    } else {
-      setError('Código incorrecto. Inténtalo de nuevo.');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Código incorrecto. Inténtalo de nuevo.';
+      setError(msg);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const resendCode = () => {
-    setCountdown(45);
-    setCanResend(false);
+  const resendCode = async () => {
+    if (!pendingData?.email || resendLoading) return;
+    setResendLoading(true);
     setError('');
+    try {
+      await authApi.resendCode(pendingData.email);
+      setCountdown(45);
+      setCanResend(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo reenviar el código. Intenta más tarde.');
+    } finally {
+      setResendLoading(false);
+    }
   };
 
-  // Mask email
-  const maskedEmail = pendingData?.correo
-    ? pendingData.correo.replace(/(.{2})(.+)(@.+)/, (_, a: string, b: string, c: string) => a + '*'.repeat(Math.min(b.length, 6)) + c)
+  const maskedEmail = pendingData?.email
+    ? pendingData.email.replace(/(.{2})(.+)(@.+)/, (_: string, a: string, b: string, c: string) => a + '*'.repeat(Math.min(b.length, 6)) + c)
     : '';
 
   const T = useThemeTokens();
@@ -158,15 +163,6 @@ export default function VerifyEmailPage() {
           <p className="mb-2" style={{ color: T.textMuted, fontSize: '14px', lineHeight: 1.6 }}>Enviamos un código de 6 dígitos a</p>
           <p className="mb-6" style={{ color: T.link, fontSize: '14px', fontWeight: 500 }}>{maskedEmail}</p>
 
-          {/* Demo hint */}
-          <div className="flex items-center gap-3 p-3.5 rounded-xl mb-6"
-            style={{ background: T.secondaryBg, border: `1px solid ${T.secondaryBorder}` }}>
-            <span style={{ color: T.secondary, fontSize: '13px' }}>
-              Código de prueba:{' '}
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, letterSpacing: '0.1em', color: T.text }}>123456</span>
-            </span>
-          </div>
-
           {error && (
             <div className="flex items-start gap-3 p-3.5 rounded-xl mb-5"
               style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}>
@@ -182,7 +178,7 @@ export default function VerifyEmailPage() {
                   id={`code-${index}`} type="text" inputMode="numeric" maxLength={1}
                   value={digit} onChange={e => handleCodeChange(index, e.target.value)}
                   onKeyDown={e => handleKeyDown(index, e)}
-                  className="w-12 h-14 text-center rounded-xl outline-none transition-all font-mono-num"
+                  className="w-12 h-14 text-center rounded-xl outline-none transition-all"
                   style={{
                     background: T.inputBg,
                     border: `1.5px solid ${digit ? T.inputFocusBorder : T.inputBorder}`,
@@ -216,9 +212,11 @@ export default function VerifyEmailPage() {
               ¿No recibiste el código?
             </p>
             {canResend ? (
-              <button onClick={resendCode} className="flex items-center gap-2 mx-auto transition-all"
-                style={{ color: T.link, background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
-                <RefreshCw size={14} /> Reenviar código
+              <button onClick={resendCode} disabled={resendLoading}
+                className="flex items-center gap-2 mx-auto transition-all"
+                style={{ color: T.link, background: 'none', border: 'none', cursor: resendLoading ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 500, opacity: resendLoading ? 0.7 : 1 }}>
+                <RefreshCw size={14} className={resendLoading ? 'animate-spin' : ''} />
+                {resendLoading ? 'Reenviando...' : 'Reenviar código'}
               </button>
             ) : (
               <p style={{ color: T.textSubtle, fontSize: '13px' }}>

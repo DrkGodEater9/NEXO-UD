@@ -28,6 +28,14 @@ public class User {
     @Column(nullable = false)
     private String passwordHash;
 
+    // Código estudiantil (ej. 20201515042)
+    @Column(unique = true)
+    private String studentCode;
+
+    // Semestre de ingreso (ej. "2020-1")
+    @Column(length = 10)
+    private String entrySemester;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;

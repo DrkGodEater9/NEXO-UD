@@ -88,7 +88,7 @@ export default function DashboardPage() {
             className="mb-1"
             style={{ color: T.text, fontWeight: 700, fontSize: 'clamp(1.5rem, 3vw, 2rem)', letterSpacing: '-0.02em' }}
           >
-            {getGreeting(user.nombre)} 👋
+            {getGreeting(user.nickname)} 👋
           </h1>
           <p style={{ color: T.textMuted, fontSize: '15px' }}>
             Tu resumen académico de hoy, {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
