@@ -18,6 +18,5 @@ WORKDIR /app
 # Copy the compiled jar from the build stage
 COPY --from=build /app/target/*.jar app.jar
 # Expose the port (Render assigns $PORT at runtime, usually 10000 or 8080)
-EXPOSE 8080
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
