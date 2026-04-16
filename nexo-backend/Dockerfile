@@ -18,5 +18,5 @@ WORKDIR /app
 # Copy the compiled jar from the build stage
 COPY --from=build /app/target/*.jar app.jar
 # Expose the port (Render assigns $PORT at runtime, usually 10000 or 8080)
-# Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run the application with explicit memory limits to prevent out of memory (OOM) crashes on free tiers
+ENTRYPOINT ["java", "-Xmx256m", "-Xmx256m", "-jar", "app.jar"]
