@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# python scripts/pdf-extractor/extractor_horarios.py
+
 """
 Extractor robusto de horarios - Universidad Distrital Francisco José de Caldas
 Período 2026-1
@@ -569,8 +571,8 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("GENERANDO ARCHIVOS")
     print("=" * 60)
-    generate_json(all_materias, os.path.join(SCRIPT_DIR, 'data.json'))
-    generate_js(all_materias, os.path.join(SCRIPT_DIR, 'data.js'))
+    generate_json(all_materias, os.path.join(os.path.dirname(SCRIPT_DIR), 'data.json'))
+    generate_js(all_materias, os.path.join(os.path.dirname(SCRIPT_DIR), 'data.js'))
 
     total_materias = len(all_materias)
     total_grupos = sum(len(m['grupos']) for m in all_materias.values())

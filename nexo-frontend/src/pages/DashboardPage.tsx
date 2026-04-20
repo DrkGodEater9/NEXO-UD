@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
 import {
   Calendar, BookOpen, Clock, MapPin, ArrowRight,
-  TrendingUp, Zap, Heart, Coffee, GraduationCap
+  TrendingUp, Zap, Loader2
 } from 'lucide-react';
+import { welfareApi, WelfareData, announcementsApi, AnnouncementData, campusApi } from '../services/api';
 
 function getGreeting(name: string): string {
   const hour = new Date().getHours();
@@ -25,17 +26,37 @@ export default function DashboardPage() {
     if (!isAuthenticated) navigate('/login');
   }, [isAuthenticated, navigate]);
 
+  const [welfareItems, setWelfareItems] = useState<WelfareData[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementData[]>([]);
+  const [noticesLoading, setNoticesLoading] = useState(true);
+
+  const [totalCampus, setTotalCampus] = useState(0);
+
+  const fetchNotices = useCallback(async () => {
+    setNoticesLoading(true);
+    try {
+      const [w, a, c] = await Promise.all([welfareApi.list(), announcementsApi.list(), campusApi.list()]);
+      setWelfareItems(w.slice(0, 3));
+      setAnnouncements(a.slice(0, 3));
+      setTotalCampus(c.length);
+    } catch { /* silent */ }
+    finally { setNoticesLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchNotices(); }, [fetchNotices]);
+
   if (!isAuthenticated || !user) return null;
 
   const totalHorarios = user.horariosGuardados?.length || 0;
   const totalVistas = user.materiasVistas?.length || 0;
   const activeSchedule = user.horariosGuardados?.[0] || null;
 
-  const welfareNotices = [
-    { icon: Coffee, title: 'Apoyo alimentario 2026-1', desc: 'Los subsidios de restaurante están disponibles. Inscríbete en Bienestar Institucional.', date: '15 mar', accent: T.accentYellow },
-    { icon: Heart, title: 'Salud mental — Orientación gratis', desc: 'Sesiones de orientación psicológica individual. Agenda tu cita en el portal de bienestar.', date: '18 mar', accent: T.accentPink },
-    { icon: GraduationCap, title: 'Becas de excelencia 2026', desc: 'Convocatoria abierta hasta el 30 de abril. Promedio mínimo 3.8.', date: '30 abr', accent: T.accentGreen },
-  ];
+  const welfareCategoryAccent: Record<string, typeof T.accentYellow> = {
+    APOYO_ALIMENTARIO: T.accentYellow,
+    BECAS: T.accentGreen,
+    SALUD_MENTAL: T.accentPink,
+    SERVICIOS_SALUD: T.accentCyan,
+  };
 
   const summaryCards = [
     {
@@ -65,8 +86,8 @@ export default function DashboardPage() {
     {
       icon: MapPin,
       label: 'Sedes activas',
-      value: '5',
-      sub: 'sedes en Bogotá',
+      value: `${totalCampus}`,
+      sub: 'sedes registradas',
       accent: T.accentYellow,
       onClick: () => navigate('/info'),
     },
@@ -243,14 +264,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Welfare Notices */}
+        {/* Notices from API */}
         <div
           className="p-6 rounded-2xl"
           style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
         >
           <div className="flex items-center justify-between mb-5">
             <h2 style={{ color: T.text, fontWeight: 600, fontSize: '16px' }}>
-              Avisos de bienestar
+              Avisos recientes
             </h2>
             <button
               onClick={() => navigate('/info')}
@@ -259,29 +280,52 @@ export default function DashboardPage() {
               Ver todos
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {welfareNotices.map(({ icon: Icon, title, desc, date, accent }) => (
-              <div
-                key={title}
-                className="p-4 rounded-xl transition-all"
-                style={{ background: accent.bg, border: `1px solid ${accent.border}` }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <Icon size={18} style={{ color: accent.color }} />
-                  <span
-                    className="px-2 py-0.5 rounded-full"
-                    style={{ background: T.isDark ? `${accent.color}18` : 'rgba(255,255,255,0.7)', color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}
+          {noticesLoading ? (
+            <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: T.textMuted }} /></div>
+          ) : (welfareItems.length === 0 && announcements.length === 0) ? (
+            <p className="py-6 text-center" style={{ color: T.textMuted, fontSize: '13px' }}>No hay avisos disponibles aún.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {welfareItems.map(item => {
+                const accent = welfareCategoryAccent[item.category] || T.accentIndigo;
+                return (
+                  <div
+                    key={`w-${item.id}`}
+                    className="p-4 rounded-xl transition-all"
+                    style={{ background: accent.bg, border: `1px solid ${accent.border}` }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                   >
-                    {date}
-                  </span>
-                </div>
-                <h3 style={{ color: T.text, fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{title}</h3>
-                <p style={{ color: T.textMuted, fontSize: '12px', lineHeight: 1.5 }}>{desc}</p>
-              </div>
-            ))}
-          </div>
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="px-2 py-0.5 rounded-full" style={{ background: T.isDark ? `${accent.color}18` : 'rgba(255,255,255,0.7)', color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>Bienestar</span>
+                      <span style={{ color: T.textSubtle, fontSize: '10px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</span>
+                    </div>
+                    <h3 style={{ color: T.text, fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{item.title}</h3>
+                    <p style={{ color: T.textMuted, fontSize: '12px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
+                  </div>
+                );
+              })}
+              {announcements.map(item => {
+                const accent = item.type === 'ASAMBLEA' ? T.accentYellow : T.accentCyan;
+                return (
+                  <div
+                    key={`a-${item.id}`}
+                    className="p-4 rounded-xl transition-all"
+                    style={{ background: accent.bg, border: `1px solid ${accent.border}` }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="px-2 py-0.5 rounded-full" style={{ background: T.isDark ? `${accent.color}18` : 'rgba(255,255,255,0.7)', color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>Aviso</span>
+                      <span style={{ color: T.textSubtle, fontSize: '10px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</span>
+                    </div>
+                    <h3 style={{ color: T.text, fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{item.title}</h3>
+                    <p style={{ color: T.textMuted, fontSize: '12px', lineHeight: 1.5 }} className="line-clamp-2">{item.body}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

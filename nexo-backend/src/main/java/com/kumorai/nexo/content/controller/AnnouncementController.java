@@ -37,7 +37,7 @@ public class AnnouncementController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('RADICADOR_AVISOS')")
+    @PreAuthorize("hasRole('RADICADOR_AVISOS') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<AnnouncementResponse> create(@Valid @RequestBody AnnouncementRequest request,
                                                        @AuthenticationPrincipal String email) {
         Long createdBy = userService.getMyProfile(email).id();
@@ -45,7 +45,7 @@ public class AnnouncementController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('RADICADOR_AVISOS')")
+    @PreAuthorize("hasRole('RADICADOR_AVISOS') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<AnnouncementResponse> update(@PathVariable Long id,
                                                        @Valid @RequestBody AnnouncementRequest request) {
         return ResponseEntity.ok(announcementService.update(id, request));

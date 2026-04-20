@@ -11,9 +11,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('nexoud_token');
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) ?? {}),
   };
+
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -133,5 +136,224 @@ export interface UserProfile {
 export const userApi = {
   me() {
     return request<UserProfile>('/users/me');
+  },
+};
+
+// ─── Admin Academic Offers ───────────────────────────────────────────────────
+
+export interface AcademicOfferUploadResponse {
+  offerId: number;
+  semester: string;
+  uploadedAt: string;
+  facultades: number;
+  carreras: number;
+  materias: number;
+  grupos: number;
+  horarios: number;
+  warnings: string[];
+}
+
+export const academicOfferApi = {
+  upload(file: File, semester: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('semester', semester);
+
+    return request<AcademicOfferUploadResponse>('/admin/academic-offers/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+};
+
+// ─── Admin Users & Roles ─────────────────────────────────────────────────────
+
+export interface UserSummary {
+  id: number;
+  email: string;
+  nickname: string;
+  active: boolean;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+export interface RoleInfo {
+  id: number;
+  roleName: string;
+  assignedAt: string;
+}
+
+export const adminApi = {
+  listUsers(page = 0, size = 20, email?: string) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (email) params.set('email', email);
+    return request<PageResponse<UserSummary>>(`/admin/users?${params}`);
+  },
+  getUserById(id: number) {
+    return request<UserProfile>(`/admin/users/${id}`);
+  },
+  setUserStatus(id: number, active: boolean) {
+    return request<void>(`/admin/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active }),
+    });
+  },
+  listRoles() {
+    return request<string[]>('/admin/roles');
+  },
+  getUserRoles(userId: number) {
+    return request<RoleInfo[]>(`/admin/roles/users/${userId}`);
+  },
+  assignRole(userId: number, roleName: string) {
+    return request<void>(`/admin/roles/users/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ roleName }),
+    });
+  },
+  revokeRole(userId: number, roleId: number) {
+    return request<void>(`/admin/roles/users/${userId}/${roleId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ─── Announcements ──────────────────────────────────────────────────────────
+
+export interface AnnouncementData {
+  id: number;
+  title: string;
+  body: string;
+  scope: string;
+  type: string;
+  faculty: string | null;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnnouncementPayload {
+  title: string;
+  body: string;
+  scope: 'FACULTAD' | 'UNIVERSIDAD';
+  type: 'GENERAL' | 'ASAMBLEA';
+  faculty?: string;
+}
+
+export const announcementsApi = {
+  list(scope?: string, type?: string) {
+    const params = new URLSearchParams();
+    if (scope) params.set('scope', scope);
+    if (type) params.set('type', type);
+    const qs = params.toString();
+    return request<AnnouncementData[]>(`/announcements${qs ? '?' + qs : ''}`);
+  },
+  getById(id: number) {
+    return request<AnnouncementData>(`/announcements/${id}`);
+  },
+  create(data: AnnouncementPayload) {
+    return request<AnnouncementData>('/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update(id: number, data: AnnouncementPayload) {
+    return request<AnnouncementData>(`/announcements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete(id: number) {
+    return request<void>(`/announcements/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ─── Welfare ─────────────────────────────────────────────────────────────────
+
+export interface WelfareData {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  links: string | null;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WelfarePayload {
+  title: string;
+  description: string;
+  category: 'APOYO_ALIMENTARIO' | 'BECAS' | 'SALUD_MENTAL' | 'SERVICIOS_SALUD';
+  links?: string;
+}
+
+export const welfareApi = {
+  list(category?: string) {
+    const qs = category ? `?category=${category}` : '';
+    return request<WelfareData[]>(`/welfare${qs}`);
+  },
+  create(data: WelfarePayload) {
+    return request<WelfareData>('/welfare', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update(id: number, data: WelfarePayload) {
+    return request<WelfareData>(`/welfare/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete(id: number) {
+    return request<void>(`/welfare/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ─── Campus ──────────────────────────────────────────────────────────────────
+
+export interface CampusData {
+  id: number;
+  name: string;
+  address: string;
+  faculty: string;
+  latitude: number | null;
+  longitude: number | null;
+  mapUrl: string | null;
+  classrooms: { id: number; name: string; building: string; floor: number; capacity: number | null }[];
+}
+
+export interface CampusPayload {
+  name: string;
+  address?: string;
+  faculty: string;
+  latitude?: number;
+  longitude?: number;
+  mapUrl?: string;
+}
+
+export const campusApi = {
+  list() {
+    return request<CampusData[]>('/campus');
+  },
+  update(id: number, data: CampusPayload) {
+    return request<CampusData>(`/campus/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  create(data: CampusPayload) {
+    return request<CampusData>('/campus', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  delete(id: number) {
+    return request<void>(`/campus/${id}`, { method: 'DELETE' });
   },
 };

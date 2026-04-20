@@ -34,7 +34,7 @@ public class WelfareController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('RADICADOR_BIENESTAR')")
+    @PreAuthorize("hasRole('RADICADOR_BIENESTAR') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<WelfareContentResponse> create(@Valid @RequestBody WelfareContentRequest request,
                                                          @AuthenticationPrincipal String email) {
         Long createdBy = userService.getMyProfile(email).id();
@@ -42,7 +42,7 @@ public class WelfareController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('RADICADOR_BIENESTAR')")
+    @PreAuthorize("hasRole('RADICADOR_BIENESTAR') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<WelfareContentResponse> update(@PathVariable Long id,
                                                          @Valid @RequestBody WelfareContentRequest request) {
         return ResponseEntity.ok(welfareService.update(id, request));

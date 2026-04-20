@@ -49,10 +49,23 @@ public class CampusController {
     }
 
     @PutMapping("/{campusId}")
-    @PreAuthorize("hasRole('RADICADOR_SEDES')")
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<CampusResponse> update(@PathVariable Long campusId,
                                                  @Valid @RequestBody CampusRequest request) {
         return ResponseEntity.ok(campusService.update(campusId, request));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
+    public ResponseEntity<CampusResponse> create(@Valid @RequestBody CampusRequest request) {
+        return ResponseEntity.ok(campusService.create(request));
+    }
+
+    @DeleteMapping("/{campusId}")
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
+    public ResponseEntity<Void> delete(@PathVariable Long campusId) {
+        campusService.delete(campusId);
+        return ResponseEntity.noContent().build();
     }
 
     // ── Classrooms ────────────────────────────────────────────────────────────
@@ -63,14 +76,14 @@ public class CampusController {
     }
 
     @PostMapping("/{campusId}/classrooms")
-    @PreAuthorize("hasRole('RADICADOR_SEDES')")
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<ClassroomResponse> addClassroom(@PathVariable Long campusId,
                                                           @Valid @RequestBody ClassroomRequest request) {
         return ResponseEntity.ok(campusService.addClassroom(campusId, request));
     }
 
     @PutMapping("/{campusId}/classrooms/{classroomId}")
-    @PreAuthorize("hasRole('RADICADOR_SEDES')")
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<ClassroomResponse> updateClassroom(@PathVariable Long campusId,
                                                              @PathVariable Long classroomId,
                                                              @Valid @RequestBody ClassroomRequest request) {
@@ -88,7 +101,7 @@ public class CampusController {
     // ── Photos ────────────────────────────────────────────────────────────────
 
     @PostMapping("/{campusId}/classrooms/{classroomId}/photos")
-    @PreAuthorize("hasRole('RADICADOR_SEDES')")
+    @PreAuthorize("hasRole('RADICADOR_SEDES') or hasRole('ADMINISTRADOR')")
     public ResponseEntity<ClassroomResponse> addPhoto(@PathVariable Long campusId,
                                                       @PathVariable Long classroomId,
                                                       @RequestParam("photo") MultipartFile photo,

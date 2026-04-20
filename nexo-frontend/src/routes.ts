@@ -9,6 +9,10 @@ import ProfilePage from "./pages/ProfilePage";
 import SearchPage from "./pages/SearchPage";
 import InfoPage from "./pages/InfoPage";
 import QuickPage from "./pages/QuickPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
+import ManageAnnouncementsPage from "./pages/ManageAnnouncementsPage";
+import ManageWelfarePage from "./pages/ManageWelfarePage";
+import ManageCampusPage from "./pages/ManageCampusPage";
 
 export const router = createBrowserRouter([
   {
@@ -50,5 +54,21 @@ export const router = createBrowserRouter([
   {
     path: "/quick",
     Component: QuickPage,
+  },
+  {
+    path: "/admin",
+    Component: AdminDashboardPage,
+  },
+  {
+    path: "/manage/announcements",
+    Component: ManageAnnouncementsPage,
+  },
+  {
+    path: "/manage/welfare",
+    Component: ManageWelfarePage,
+  },
+  {
+    path: "/manage/campus",
+    Component: ManageCampusPage,
   },
 ]);

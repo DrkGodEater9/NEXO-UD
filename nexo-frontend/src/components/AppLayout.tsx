@@ -4,17 +4,35 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, Calendar, Search, Info, User, LogOut,
-  ChevronLeft, ChevronRight, Menu, X, Sun, Moon
+  ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
+  Shield, Megaphone, Heart, MapPin
 } from 'lucide-react';
 import { ConfirmModal } from './Modal';
 
-const navItems = [
+const baseNavItems = [
   { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
   { path: '/planner', label: 'Planeador', icon: Calendar },
   { path: '/search', label: 'Buscar materias', icon: Search },
   { path: '/info', label: 'Información', icon: Info },
   { path: '/profile', label: 'Mi Perfil', icon: User },
 ];
+
+function getNavItems(roles: string[]) {
+  const items = [...baseNavItems];
+  const extras: typeof baseNavItems = [];
+
+  if (roles.includes('ADMINISTRADOR'))
+    extras.push({ path: '/admin', label: 'Administración', icon: Shield });
+  if (roles.includes('RADICADOR_AVISOS'))
+    extras.push({ path: '/manage/announcements', label: 'Gestionar Avisos', icon: Megaphone });
+  if (roles.includes('RADICADOR_BIENESTAR'))
+    extras.push({ path: '/manage/welfare', label: 'Gestionar Bienestar', icon: Heart });
+  if (roles.includes('RADICADOR_SEDES'))
+    extras.push({ path: '/manage/campus', label: 'Gestionar Sedes', icon: MapPin });
+
+  if (extras.length > 0) items.push(...extras);
+  return items;
+}
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -29,6 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
 
+  const navItems = getNavItems(user?.roles ?? []);
   const isDark = theme === 'dark';
 
   // Apple-inspired light / NexoUD dark token map
