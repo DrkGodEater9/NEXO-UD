@@ -166,6 +166,38 @@ export const academicOfferApi = {
   },
 };
 
+// ─── Semesters ──────────────────────────────────────────────────────────────
+
+export interface SemesterData {
+  id: number;
+  name: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export const semesterApi = {
+  getActive() {
+    return request<SemesterData>('/semesters/active');
+  },
+  list() {
+    return request<SemesterData[]>('/admin/semesters');
+  },
+  create(name: string) {
+    return request<SemesterData>('/admin/semesters', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  },
+  activate(id: number) {
+    return request<SemesterData>(`/admin/semesters/${id}/activate`, {
+      method: 'PATCH',
+    });
+  },
+  delete(id: number) {
+    return request<void>(`/admin/semesters/${id}`, { method: 'DELETE' });
+  },
+};
+
 // ─── Admin Users & Roles ─────────────────────────────────────────────────────
 
 export interface UserSummary {

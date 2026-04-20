@@ -7,5 +7,7 @@ public record SubjectResponse(
         String codigo,
         String nombre,
         Long studyPlanId,
+        String facultad,
+        String carrera,
         List<SubjectGroupResponse> grupos
 ) {}

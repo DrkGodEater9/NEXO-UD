@@ -6,7 +6,7 @@ import { useThemeTokens } from '../context/useThemeTokens';
 import {
   UploadCloud, FileJson, CheckCircle, AlertCircle, Loader2, Database,
   AlertTriangle, Users, Shield, Megaphone, Heart, MapPin, Search,
-  Plus, Trash2, X, ChevronLeft, ChevronRight
+  Plus, Trash2, X, ChevronLeft, ChevronRight, Settings, Calendar, Star
 } from 'lucide-react';
 import {
   academicOfferApi, AcademicOfferUploadResponse, ApiError,
@@ -14,11 +14,13 @@ import {
   announcementsApi, AnnouncementData, AnnouncementPayload,
   welfareApi, WelfareData, WelfarePayload,
   campusApi, CampusData, CampusPayload,
+  semesterApi, SemesterData,
 } from '../services/api';
 
-type Section = 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus';
+type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus';
 
 const sidebarSections: { key: Section; label: string; icon: typeof Database }[] = [
+  { key: 'config', label: 'Configuración', icon: Settings },
   { key: 'upload', label: 'Carga Académica', icon: Database },
   { key: 'roles', label: 'Gestión de Roles', icon: Shield },
   { key: 'announcements', label: 'Avisos Generales', icon: Megaphone },
@@ -30,7 +32,7 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const T = useThemeTokens();
-  const [section, setSection] = useState<Section>('upload');
+  const [section, setSection] = useState<Section>('config');
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/login');
@@ -102,6 +104,7 @@ export default function AdminDashboardPage() {
 
         {/* Content Area */}
         <div className="flex-1 p-6 md:p-8 max-w-5xl">
+          {section === 'config' && <ConfigSection T={T} />}
           {section === 'upload' && <UploadSection T={T} />}
           {section === 'roles' && <RolesSection T={T} />}
           {section === 'announcements' && <AnnouncementsSection T={T} />}
@@ -119,18 +122,28 @@ export default function AdminDashboardPage() {
 
 function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
   const [file, setFile] = useState<File | null>(null);
-  const [semester, setSemester] = useState('2026-1');
+  const [activeSemester, setActiveSemester] = useState<SemesterData | null>(null);
+  const [semesterLoading, setSemesterLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<AcademicOfferUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    setSemesterLoading(true);
+    semesterApi.getActive()
+      .then(s => setActiveSemester(s))
+      .catch(() => setActiveSemester(null))
+      .finally(() => setSemesterLoading(false));
+  }, []);
+
+  const canUpload = !!file && !!activeSemester && !loading;
+
   const handleUpload = async () => {
-    if (!file) { setError('Selecciona un archivo JSON.'); return; }
-    if (!semester) { setError('Ingresa un semestre.'); return; }
+    if (!file || !activeSemester) return;
     setLoading(true); setError(null); setSuccess(null);
     try {
-      const res = await academicOfferApi.upload(file, semester);
+      const res = await academicOfferApi.upload(file, activeSemester.name);
       setSuccess(res); setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
@@ -144,14 +157,23 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block mb-2 text-sm font-medium" style={{ color: T.text }}>Periodo Académico</label>
-          <input
-            type="text" value={semester} onChange={e => setSemester(e.target.value)}
-            placeholder="Ejemplo: 2026-1"
-            className="w-full py-3 px-4 rounded-xl outline-none transition-all mb-4"
-            style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText }}
-            onFocus={e => { e.currentTarget.style.borderColor = T.inputFocusBorder; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.inputFocusShadow}`; }}
-            onBlur={e => { e.currentTarget.style.borderColor = T.inputBorder; e.currentTarget.style.boxShadow = 'none'; }}
-          />
+          {semesterLoading ? (
+            <div className="flex items-center gap-2 py-3 px-4 rounded-xl mb-4" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}` }}>
+              <Loader2 size={14} className="animate-spin" style={{ color: T.textMuted }} />
+              <span style={{ color: T.textMuted, fontSize: '13px' }}>Cargando semestre...</span>
+            </div>
+          ) : activeSemester ? (
+            <div className="flex items-center gap-2 py-3 px-4 rounded-xl mb-4" style={{ background: T.accentGreen.bg, border: `1px solid ${T.accentGreen.border}` }}>
+              <Calendar size={14} style={{ color: T.accentGreen.color }} />
+              <span style={{ color: T.accentGreen.color, fontSize: '14px', fontWeight: 600 }}>{activeSemester.name}</span>
+              <span style={{ color: T.textMuted, fontSize: '11px', marginLeft: 'auto' }}>Semestre activo</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 py-3 px-4 rounded-xl mb-4" style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}>
+              <AlertCircle size={14} style={{ color: T.error.text }} />
+              <span style={{ color: T.error.text, fontSize: '13px' }}>No hay semestre activo. Ve a <strong>Configuración</strong> para activar uno.</span>
+            </div>
+          )}
           <div
             className="w-full rounded-2xl flex flex-col items-center justify-center p-8 transition-all cursor-pointer"
             style={{
@@ -177,13 +199,13 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
             )}
           </div>
           <button
-            onClick={handleUpload} disabled={loading || !file}
+            onClick={handleUpload} disabled={!canUpload}
             className="w-full mt-4 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
             style={{
-              background: (loading || !file) ? T.cardBg2 : '#C9344C',
-              color: (loading || !file) ? T.textMuted : 'white',
-              border: (loading || !file) ? `1px solid ${T.cardBorder}` : 'none',
-              cursor: (loading || !file) ? 'not-allowed' : 'pointer',
+              background: !canUpload ? T.cardBg2 : '#C9344C',
+              color: !canUpload ? T.textMuted : 'white',
+              border: !canUpload ? `1px solid ${T.cardBorder}` : 'none',
+              cursor: !canUpload ? 'not-allowed' : 'pointer',
               fontSize: '14px', fontWeight: 600,
             }}
           >
@@ -224,13 +246,172 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
             <div className="rounded-2xl p-6 h-full flex flex-col justify-center" style={{ background: T.cardBg2, border: `1px solid ${T.cardBorder}` }}>
               <h3 className="mb-3" style={{ color: T.text, fontSize: '15px', fontWeight: 600 }}>Instrucciones</h3>
               <ol className="space-y-3" style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
-                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>1</span>Ejecuta <code style={{ color: T.primary }}>extractor_horarios.py</code> con los PDFs.</li>
-                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>2</span>Busca el <code style={{ color: T.primary }}>data.json</code> generado.</li>
-                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>3</span>Selecciona el periodo académico correcto.</li>
+                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>1</span>Ve a <strong style={{ color: T.primary }}>Configuración</strong> y activa el semestre correspondiente.</li>
+                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>2</span>Ejecuta <code style={{ color: T.primary }}>extractor_horarios.py</code> con los PDFs.</li>
+                <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>3</span>Busca el <code style={{ color: T.primary }}>data.json</code> generado y súbelo aquí.</li>
               </ol>
             </div>
           )}
         </div>
+      </div>
+    </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════ */
+/*  CONFIG SECTION                                                             */
+/* ════════════════════════════════════════════════════════════════════════════ */
+
+function ConfigSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
+  const [semesters, setSemesters] = useState<SemesterData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const fetchSemesters = useCallback(async () => {
+    setLoading(true); setError(null);
+    try { setSemesters(await semesterApi.list()); }
+    catch (e) { setError(e instanceof ApiError ? e.message : 'Error cargando semestres'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchSemesters(); }, [fetchSemesters]);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true); setError(null);
+    try {
+      await semesterApi.create(newName.trim());
+      setNewName('');
+      await fetchSemesters();
+    } catch (e) { setError(e instanceof ApiError ? e.message : 'Error creando semestre'); }
+    finally { setCreating(false); }
+  };
+
+  const handleActivate = async (id: number) => {
+    setError(null);
+    try { await semesterApi.activate(id); await fetchSemesters(); }
+    catch (e) { setError(e instanceof ApiError ? e.message : 'Error activando semestre'); }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Eliminar este semestre?')) return;
+    setError(null);
+    try { await semesterApi.delete(id); await fetchSemesters(); }
+    catch (e) { setError(e instanceof ApiError ? e.message : 'Error eliminando semestre'); }
+  };
+
+  const activeSemester = semesters.find(s => s.active);
+
+  return (
+    <>
+      <SectionHeader icon={Settings} title="Configuración" subtitle="Gestiona los periodos académicos del sistema." T={T} />
+
+      {/* Active semester highlight */}
+      <div className="mb-6 p-5 rounded-2xl" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar size={16} style={{ color: T.primary }} />
+          <h3 style={{ color: T.text, fontSize: '15px', fontWeight: 600 }}>Semestre Activo</h3>
+        </div>
+        {activeSemester ? (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl" style={{ background: T.accentGreen.bg, border: `1px solid ${T.accentGreen.border}` }}>
+              <Star size={14} style={{ color: T.accentGreen.color }} />
+              <span style={{ color: T.accentGreen.color, fontSize: '18px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{activeSemester.name}</span>
+            </div>
+            <p style={{ color: T.textMuted, fontSize: '12px' }}>Este periodo se usará para la carga académica y las búsquedas de materias.</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl" style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}>
+            <AlertCircle size={14} style={{ color: T.error.text }} />
+            <span style={{ color: T.error.text, fontSize: '13px' }}>No hay semestre activo. Crea uno y actívalo.</span>
+          </div>
+        )}
+      </div>
+
+      {error && <ErrorBanner message={error} T={T} />}
+
+      {/* Create semester */}
+      <div className="mb-6 p-5 rounded-2xl" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+        <h3 className="mb-3" style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>Crear Nuevo Semestre</h3>
+        <div className="flex gap-2">
+          <input
+            type="text" value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="Ej: 2026-2"
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            className="flex-1 py-2.5 px-4 rounded-xl outline-none transition-all"
+            style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '14px' }}
+            onFocus={e => { e.currentTarget.style.borderColor = T.inputFocusBorder; }}
+            onBlur={e => { e.currentTarget.style.borderColor = T.inputBorder; }}
+          />
+          <button
+            onClick={handleCreate} disabled={creating || !newName.trim()}
+            className="px-5 py-2.5 rounded-xl flex items-center gap-1.5 transition-all"
+            style={{
+              background: (!newName.trim() || creating) ? T.cardBg2 : '#C9344C',
+              color: (!newName.trim() || creating) ? T.textMuted : 'white',
+              border: (!newName.trim() || creating) ? `1px solid ${T.cardBorder}` : 'none',
+              cursor: (!newName.trim() || creating) ? 'not-allowed' : 'pointer',
+              fontSize: '13px', fontWeight: 600,
+            }}
+          >
+            {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Crear
+          </button>
+        </div>
+      </div>
+
+      {/* Semester list */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+        <div className="px-5 py-3" style={{ borderBottom: `1px solid ${T.divider}` }}>
+          <p style={{ color: T.text, fontWeight: 600, fontSize: '14px' }}>Semestres Registrados ({semesters.length})</p>
+        </div>
+        {loading ? <LoadingIndicator T={T} /> : semesters.length === 0 ? (
+          <EmptyState label="No hay semestres creados aún." T={T} />
+        ) : (
+          <div>
+            {semesters.map(sem => (
+              <div
+                key={sem.id}
+                className="flex items-center gap-4 px-5 py-4 transition-all"
+                style={{ borderBottom: `1px solid ${T.divider}`, background: sem.active ? T.accentGreen.bg : 'transparent' }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: T.text, fontSize: '15px', fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>{sem.name}</span>
+                    {sem.active && (
+                      <span className="px-2 py-0.5 rounded-full" style={{ background: T.accentGreen.color, color: 'white', fontSize: '10px', fontWeight: 700 }}>ACTIVO</span>
+                    )}
+                  </div>
+                  <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '2px' }}>
+                    Creado el {new Date(sem.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {!sem.active && (
+                    <button
+                      onClick={() => handleActivate(sem.id)}
+                      className="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                      style={{ background: T.accentGreen.bg, border: `1px solid ${T.accentGreen.border}`, color: T.accentGreen.color, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+                    >
+                      <Star size={12} /> Activar
+                    </button>
+                  )}
+                  {!sem.active && (
+                    <button
+                      onClick={() => handleDelete(sem.id)}
+                      className="p-1.5 rounded-lg transition-all"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

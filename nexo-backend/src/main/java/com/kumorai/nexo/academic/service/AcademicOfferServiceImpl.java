@@ -12,8 +12,10 @@ import com.kumorai.nexo.academic.entity.DayOfWeek;
 import com.kumorai.nexo.academic.entity.StudyPlan;
 import com.kumorai.nexo.academic.entity.Subject;
 import com.kumorai.nexo.academic.entity.SubjectGroup;
+import com.kumorai.nexo.academic.entity.Semester;
 import com.kumorai.nexo.academic.entity.TimeBlock;
 import com.kumorai.nexo.academic.repository.AcademicOfferRepository;
+import com.kumorai.nexo.academic.repository.SemesterRepository;
 import com.kumorai.nexo.academic.repository.StudyPlanRepository;
 import com.kumorai.nexo.academic.repository.SubjectGroupRepository;
 import com.kumorai.nexo.academic.repository.SubjectRepository;
@@ -38,6 +40,7 @@ public class AcademicOfferServiceImpl implements AcademicOfferService {
     private final SubjectRepository subjectRepository;
     private final SubjectGroupRepository subjectGroupRepository;
     private final TimeBlockRepository timeBlockRepository;
+    private final SemesterRepository semesterRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -79,6 +82,15 @@ public class AcademicOfferServiceImpl implements AcademicOfferService {
     @Override
     @Transactional
     public AcademicOfferUploadResponse upload(MultipartFile file, String semester, Long uploadedBy) {
+        // Validar que el semestre corresponde al semestre activo
+        Semester activeSemester = semesterRepository.findByActiveTrue()
+                .orElseThrow(() -> NexoException.badRequest(
+                        "No hay un semestre activo configurado. Ve a Configuración y activa un semestre."));
+        if (!activeSemester.getName().equals(semester)) {
+            throw NexoException.badRequest(
+                    "El semestre '" + semester + "' no coincide con el semestre activo '" + activeSemester.getName() + "'");
+        }
+
         JsonNode root;
         try {
             root = objectMapper.readTree(file.getInputStream());

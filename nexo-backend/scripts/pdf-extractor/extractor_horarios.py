@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#entorno virtual - pip install pdfplumber
 # python scripts/pdf-extractor/extractor_horarios.py
 
 """
