@@ -3,39 +3,48 @@ import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
-import { materiasData, getFacultades, getCarreras } from '../data/materiasData';
-import { Search, Filter, ChevronDown, ChevronUp, Plus, MapPin, User, BookOpen, X } from 'lucide-react';
+import { scheduleApi, SubjectResponse, SubjectGroupResponse } from '../services/api';
+import { Search, Filter, ChevronDown, ChevronUp, Plus, MapPin, User, Loader2, X } from 'lucide-react';
 
-const CREDITOS_OPTIONS = ['1', '2', '3', '4', '5', '6'];
 const FRANJAS = ['Mañana (6-12h)', 'Tarde (12-18h)', 'Noche (18-22h)'];
 
 export default function SearchPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const T = useThemeTokens();
+  
+  const [loading, setLoading] = useState(true);
+  const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedFacultad, setSelectedFacultad] = useState('');
   const [selectedCarrera, setSelectedCarrera] = useState('');
-  const [selectedCreditos, setSelectedCreditos] = useState('');
   const [selectedFranja, setSelectedFranja] = useState('');
   const [expandedMateria, setExpandedMateria] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) navigate('/login');
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
+    // Fetch subjects from backend
+    scheduleApi.getOfferSubjects()
+      .then(res => setSubjects(res || []))
+      .catch(err => console.error("Error fetching subjects:", err))
+      .finally(() => setLoading(false));
   }, [isAuthenticated, navigate]);
 
-  const facultades = getFacultades();
-  const carreras = getCarreras(selectedFacultad);
+  const facultades = useMemo(() => Array.from(new Set(subjects.map(s => s.facultad).filter(Boolean))).sort(), [subjects]);
+  const carreras = useMemo(() => Array.from(new Set(subjects.filter(s => !selectedFacultad || s.facultad === selectedFacultad).map(s => s.carrera).filter(Boolean))).sort(), [subjects, selectedFacultad]);
 
   const filtered = useMemo(() => {
     const text = searchText.toLowerCase();
-    return Object.values(materiasData)
+    return subjects
       .filter(m => {
         const matchText = !text || m.nombre.toLowerCase().includes(text) || m.codigo.includes(text);
         const matchFacultad = !selectedFacultad || m.facultad === selectedFacultad;
         const matchCarrera = !selectedCarrera || m.carrera === selectedCarrera;
-        const matchCreditos = !selectedCreditos || String(m.creditos) === selectedCreditos;
         const matchFranja = !selectedFranja || m.grupos.some(g =>
           g.horarios.some(h => {
             if (selectedFranja.startsWith('Mañana')) return h.horaInicio >= 6 && h.horaFin <= 12;
@@ -44,20 +53,19 @@ export default function SearchPage() {
             return true;
           })
         );
-        return matchText && matchFacultad && matchCarrera && matchCreditos && matchFranja;
+        return matchText && matchFacultad && matchCarrera && matchFranja;
       })
       .sort((a, b) => a.nombre.localeCompare(b.nombre))
       .slice(0, 50);
-  }, [searchText, selectedFacultad, selectedCarrera, selectedCreditos, selectedFranja]);
+  }, [subjects, searchText, selectedFacultad, selectedCarrera, selectedFranja]);
 
   const clearFilters = () => {
     setSelectedFacultad('');
     setSelectedCarrera('');
-    setSelectedCreditos('');
     setSelectedFranja('');
   };
 
-  const activeFilters = [selectedFacultad, selectedCarrera, selectedCreditos, selectedFranja].filter(Boolean).length;
+  const activeFilters = [selectedFacultad, selectedCarrera, selectedFranja].filter(Boolean).length;
 
   return (
     <AppLayout>
@@ -118,12 +126,11 @@ export default function SearchPage() {
 
         {/* Filters panel */}
         {showFilters && (
-          <div className="p-5 rounded-2xl mb-5 grid grid-cols-2 md:grid-cols-4 gap-3 animate-slide-down"
+          <div className="p-5 rounded-2xl mb-5 grid grid-cols-1 md:grid-cols-3 gap-3 animate-slide-down"
             style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}>
             {[
               { label: 'Facultad', value: selectedFacultad, options: facultades, onChange: (v: string) => { setSelectedFacultad(v); setSelectedCarrera(''); } },
               { label: 'Proyecto curricular', value: selectedCarrera, options: carreras, onChange: (v: string) => setSelectedCarrera(v) },
-              { label: 'Créditos', value: selectedCreditos, options: CREDITOS_OPTIONS, onChange: (v: string) => setSelectedCreditos(v) },
               { label: 'Franja horaria', value: selectedFranja, options: FRANJAS, onChange: (v: string) => setSelectedFranja(v) },
             ].map(({ label, value, options, onChange }) => (
               <div key={label}>
@@ -141,88 +148,93 @@ export default function SearchPage() {
 
         {/* Results */}
         <div className="space-y-3">
-          {filtered.length === 0 && (searchText || activeFilters > 0) && (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 size={32} className="animate-spin" style={{ color: T.primary, marginBottom: '12px' }} />
+              <p style={{ color: T.textMuted, fontSize: '15px', fontWeight: 500 }}>Cargando oferta académica...</p>
+            </div>
+          ) : filtered.length === 0 && (searchText || activeFilters > 0) ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Search size={32} style={{ color: T.textSubtle, marginBottom: '12px' }} />
               <p style={{ color: T.textMuted, fontSize: '15px', fontWeight: 500 }}>No se encontraron materias</p>
               <p style={{ color: T.textSubtle, fontSize: '13px', marginTop: '4px' }}>Intenta con otros términos o filtros</p>
             </div>
-          )}
-          {!searchText && activeFilters === 0 && (
+          ) : !searchText && activeFilters === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Search size={32} style={{ color: T.textSubtle, marginBottom: '12px' }} />
               <p style={{ color: T.textMuted, fontSize: '15px', fontWeight: 500 }}>Busca una materia para comenzar</p>
               <p style={{ color: T.textSubtle, fontSize: '13px', marginTop: '4px' }}>Escribe el nombre, código o usa los filtros</p>
             </div>
-          )}
-          {filtered.map(materia => (
-            <div key={materia.codigo}
-              className="rounded-2xl overflow-hidden transition-all duration-200"
-              style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}>
-              <div
-                className="flex items-center gap-4 p-4 cursor-pointer"
-                onClick={() => setExpandedMateria(expandedMateria === materia.codigo ? null : materia.codigo)}
-                onMouseEnter={e => { e.currentTarget.style.background = T.cardBg2; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono-num" style={{ color: T.primary, fontSize: '11px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{materia.codigo}</span>
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: T.primaryBg, color: T.primary, fontSize: '10px', fontWeight: 600, border: `1px solid ${T.primaryBorder}` }}>{materia.creditos} cr.</span>
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, color: T.tagColor, fontSize: '10px', fontWeight: 500, border: `1px solid ${T.tagBorder}` }}>{materia.facultad}</span>
+          ) : (
+            filtered.map((materia: SubjectResponse) => (
+              <div key={materia.codigo}
+                className="rounded-2xl overflow-hidden transition-all duration-200"
+                style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}>
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer"
+                  onClick={() => setExpandedMateria(expandedMateria === materia.codigo ? null : materia.codigo)}
+                  onMouseEnter={e => { e.currentTarget.style.background = T.cardBg2; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono-num" style={{ color: T.primary, fontSize: '11px', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{materia.codigo}</span>
+                      {materia.facultad && <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, color: T.tagColor, fontSize: '10px', fontWeight: 500, border: `1px solid ${T.tagBorder}` }}>{materia.facultad}</span>}
+                      {materia.carrera && <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, color: T.tagColor, fontSize: '10px', fontWeight: 500, border: `1px solid ${T.tagBorder}` }}>{materia.carrera}</span>}
+                    </div>
+                    <p style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginTop: '4px' }}>{materia.nombre}</p>
+                    <p style={{ color: T.textMuted, fontSize: '12px', marginTop: '2px' }}>{materia.grupos?.length || 0} grupo{materia.grupos?.length !== 1 ? 's' : ''} disponible{materia.grupos?.length !== 1 ? 's' : ''}</p>
                   </div>
-                  <p style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginTop: '4px' }}>{materia.nombre}</p>
-                  <p style={{ color: T.textMuted, fontSize: '12px', marginTop: '2px' }}>{materia.grupos.length} grupo{materia.grupos.length !== 1 ? 's' : ''} disponible{materia.grupos.length !== 1 ? 's' : ''}</p>
+                  {expandedMateria === materia.codigo ? <ChevronUp size={18} style={{ color: T.textMuted, flexShrink: 0 }} /> : <ChevronDown size={18} style={{ color: T.textMuted, flexShrink: 0 }} />}
                 </div>
-                {expandedMateria === materia.codigo ? <ChevronUp size={18} style={{ color: T.textMuted, flexShrink: 0 }} /> : <ChevronDown size={18} style={{ color: T.textMuted, flexShrink: 0 }} />}
-              </div>
 
-              {expandedMateria === materia.codigo && (
-                <div className="px-4 pb-4" style={{ borderTop: `1px solid ${T.divider}` }}>
-                  <div className="space-y-3 mt-4">
-                    {materia.grupos.map(grupo => (
-                      <div key={grupo.grupo} className="p-4 rounded-xl"
-                        style={{ background: T.cardBg2, border: `1px solid ${T.divider}` }}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-lg"
-                                style={{ background: T.primaryBg, color: T.primary, fontSize: '11px', fontWeight: 700, border: `1px solid ${T.primaryBorder}` }}>
-                                Grupo {grupo.grupo}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 mb-1.5">
-                              <User size={12} style={{ color: T.textMuted }} />
-                              <span style={{ color: T.textMuted, fontSize: '12px' }}>{grupo.docente}</span>
-                            </div>
-                            {grupo.horarios.map((h, i) => (
-                              <div key={i} className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                <span style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>{h.dia}</span>
-                                <span style={{ color: T.textMuted, fontSize: '12px' }}>{h.horaInicio}:00 – {h.horaFin}:00</span>
-                                {h.ubicacion && (
-                                  <div className="flex items-center gap-1">
-                                    <MapPin size={10} style={{ color: T.textSubtle }} />
-                                    <span style={{ color: T.textSubtle, fontSize: '11px' }}>{h.ubicacion}</span>
-                                  </div>
-                                )}
+                {expandedMateria === materia.codigo && materia.grupos && (
+                  <div className="px-4 pb-4" style={{ borderTop: `1px solid ${T.divider}` }}>
+                    <div className="space-y-3 mt-4">
+                      {materia.grupos.map((grupo: SubjectGroupResponse) => (
+                        <div key={grupo.grupoCode} className="p-4 rounded-xl"
+                          style={{ background: T.cardBg2, border: `1px solid ${T.divider}` }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className="px-2 py-0.5 rounded-lg"
+                                  style={{ background: T.primaryBg, color: T.primary, fontSize: '11px', fontWeight: 700, border: `1px solid ${T.primaryBorder}` }}>
+                                  Grupo {grupo.grupoCode}
+                                </span>
                               </div>
-                            ))}
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <User size={12} style={{ color: T.textMuted }} />
+                                <span style={{ color: T.textMuted, fontSize: '12px' }}>{grupo.docente || 'SIN DOCENTE'}</span>
+                              </div>
+                              {grupo.horarios?.map((h, i) => (
+                                <div key={i} className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                  <span style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>{h.dia}</span>
+                                  <span style={{ color: T.textMuted, fontSize: '12px' }}>{h.horaInicio}:00 – {h.horaFin}:00</span>
+                                  {h.ubicacion && (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin size={10} style={{ color: T.textSubtle }} />
+                                      <span style={{ color: T.textSubtle, fontSize: '11px' }}>{h.ubicacion}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={() => navigate('/planner')}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl flex-shrink-0 transition-all"
+                              style={{ background: '#C9344C', color: 'white', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#A02438'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#C9344C'}>
+                              <Plus size={13} /> Agregar
+                            </button>
                           </div>
-                          <button
-                            onClick={() => navigate('/planner')}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl flex-shrink-0 transition-all"
-                            style={{ background: '#C9344C', color: 'white', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#A02438'}
-                            onMouseLeave={e => e.currentTarget.style.background = '#C9344C'}>
-                            <Plus size={13} /> Agregar
-                          </button>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </AppLayout>

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,9 +47,12 @@ public class AcademicOfferServiceImpl implements AcademicOfferService {
     @Override
     @Transactional(readOnly = true)
     public AcademicOfferResponse getActive() {
-        return offerRepository.findByActiveTrue()
+        Semester activeSemester = semesterRepository.findByActiveTrue()
+                .orElseThrow(() -> NexoException.notFound("No hay semestre activo configurado."));
+                
+        return offerRepository.findFirstBySemesterOrderByUploadedAtDesc(activeSemester.getName())
                 .map(this::toResponse)
-                .orElseThrow(() -> NexoException.notFound("No hay oferta académica activa"));
+                .orElseThrow(() -> NexoException.notFound("No se han cargado materias para el semestre activo (" + activeSemester.getName() + ")"));
     }
 
     @Override
@@ -216,6 +220,17 @@ public class AcademicOfferServiceImpl implements AcademicOfferService {
     public void delete(Long offerId) {
         AcademicOffer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> NexoException.notFound("Oferta académica no encontrada"));
+                
+        // Encontrar todos los grupos asociados a esta oferta
+        List<SubjectGroup> groups = subjectGroupRepository.findByAcademicOfferId(offerId);
+        
+        // Extraer los Subjects correspondientes a esos grupos para eliminarlos completos y que en cascada borren los grupos y time_blocks
+        // (Nota: el extractor crea Subjects nuevos por cada carga, por lo que podemos borrarlos sin afectar otras cargas)
+        Set<Subject> subjectsToDelete = groups.stream()
+                .map(SubjectGroup::getSubject)
+                .collect(Collectors.toSet());
+                
+        subjectRepository.deleteAll(subjectsToDelete);
         offerRepository.delete(offer);
     }
 
@@ -237,6 +252,8 @@ public class AcademicOfferServiceImpl implements AcademicOfferService {
                 subject.getCodigo(),
                 subject.getNombre(),
                 subject.getStudyPlan().getId(),
+                subject.getStudyPlan().getFacultad(),
+                subject.getStudyPlan().getNombre(),
                 subject.getGrupos().stream().map(this::toGroupResponse).toList()
         );
     }

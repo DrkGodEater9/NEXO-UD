@@ -153,7 +153,53 @@ export interface AcademicOfferUploadResponse {
   warnings: string[];
 }
 
+// ─── Schedules & Academic Offer ───────────────────────────────────────────────
+
+export interface TimeBlockResponse {
+  id: number;
+  dia: string;
+  horaInicio: number;
+  horaFin: number;
+  ubicacion: string;
+}
+
+export interface SubjectGroupResponse {
+  id: number;
+  grupoCode: string;
+  inscritos: number;
+  docente: string;
+  horarios: TimeBlockResponse[];
+}
+
+export interface SubjectResponse {
+  id: number;
+  codigo: string;
+  nombre: string;
+  studyPlanId: number;
+  facultad: string;
+  carrera: string;
+  grupos: SubjectGroupResponse[];
+}
+
+export const scheduleApi = {
+  getOfferSubjects(studyPlanId?: number) {
+    const query = studyPlanId ? `?studyPlanId=${studyPlanId}` : '';
+    return request<SubjectResponse[]>(`/schedules/offer/subjects${query}`);
+  },
+};
+
+export interface AcademicOfferResponse {
+  id: number;
+  semester: string;
+  active: boolean;
+  uploadedAt: string;
+  uploadedBy: number;
+}
+
 export const academicOfferApi = {
+  list() {
+    return request<AcademicOfferResponse[]>('/admin/academic-offers');
+  },
   upload(file: File, semester: string) {
     const formData = new FormData();
     formData.append('file', file);
@@ -164,6 +210,9 @@ export const academicOfferApi = {
       body: formData,
     });
   },
+  delete(id: number) {
+    return request<void>(`/admin/academic-offers/${id}`, { method: 'DELETE' });
+  }
 };
 
 // ─── Semesters ──────────────────────────────────────────────────────────────

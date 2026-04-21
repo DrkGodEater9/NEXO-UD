@@ -129,13 +129,24 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
   const [success, setSuccess] = useState<AcademicOfferUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [offers, setOffers] = useState<AcademicOfferResponse[]>([]);
+  const [offersLoading, setOffersLoading] = useState(true);
+
+  const fetchOffers = useCallback(async () => {
+    setOffersLoading(true);
+    try { setOffers(await academicOfferApi.list()); }
+    catch (e) { console.error("Error loading offers", e); }
+    finally { setOffersLoading(false); }
+  }, []);
+
   useEffect(() => {
     setSemesterLoading(true);
     semesterApi.getActive()
       .then(s => setActiveSemester(s))
       .catch(() => setActiveSemester(null))
       .finally(() => setSemesterLoading(false));
-  }, []);
+    fetchOffers();
+  }, [fetchOffers]);
 
   const canUpload = !!file && !!activeSemester && !loading;
 
@@ -146,9 +157,21 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
       const res = await academicOfferApi.upload(file, activeSemester.name);
       setSuccess(res); setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      await fetchOffers();
     } catch (err: unknown) {
       setError(err instanceof ApiError ? err.message : 'Error inesperado al subir.');
     } finally { setLoading(false); }
+  };
+
+  const handleDeleteOffer = async (id: number, semesterName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar TODOS los datos cargados para el semestre ${semesterName}? Esto borrará todas las materias y grupos.`)) return;
+    setError(null); setSuccess(null);
+    try {
+      await academicOfferApi.delete(id);
+      await fetchOffers();
+    } catch (err: unknown) {
+      setError(err instanceof ApiError ? err.message : 'Error al eliminar la carga.');
+    }
   };
 
   return (
@@ -250,6 +273,44 @@ function UploadSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
                 <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>2</span>Ejecuta <code style={{ color: T.primary }}>extractor_horarios.py</code> con los PDFs.</li>
                 <li className="flex gap-2"><span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: T.divider, color: T.text, fontSize: '11px', fontWeight: 600 }}>3</span>Busca el <code style={{ color: T.primary }}>data.json</code> generado y súbelo aquí.</li>
               </ol>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Existing uploaded offers */}
+      <div className="mt-8">
+        <div className="px-5 py-3 rounded-t-2xl" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, borderBottom: 'none' }}>
+          <p style={{ color: T.text, fontWeight: 600, fontSize: '14px' }}>Cargas Anteriores ({offers.length})</p>
+        </div>
+        <div className="rounded-b-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+          {offersLoading ? (
+            <div className="flex justify-center p-8"><Loader2 size={24} className="animate-spin" style={{ color: T.primary }} /></div>
+          ) : offers.length === 0 ? (
+            <div className="p-8 text-center" style={{ color: T.textSubtle, fontSize: '13px' }}>No hay cargas previas registradas.</div>
+          ) : (
+            <div>
+              {offers.map(offer => (
+                <div key={offer.id} className="flex items-center gap-4 px-5 py-4 transition-all" style={{ borderBottom: `1px solid ${T.divider}` }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span style={{ color: T.text, fontSize: '15px', fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>Semestre: {offer.semester}</span>
+                    </div>
+                    <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '2px' }}>
+                      Cargado el {new Date(offer.uploadedAt).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => handleDeleteOffer(offer.id, offer.semester)}
+                      className="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1"
+                      style={{ background: '#C9344C10', border: `1px solid #C9344C30`, color: T.error.text, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+                    >
+                      <Trash2 size={12} /> Eliminar materias
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -9,7 +9,10 @@ import java.util.Optional;
 
 public interface AcademicOfferRepository extends JpaRepository<AcademicOffer, Long> {
 
-    // Oferta activa actual — consulta más frecuente del sistema
+    // Oferta activa actual (la más reciente para el semestre activo global)
+    Optional<AcademicOffer> findFirstBySemesterOrderByUploadedAtDesc(String semester);
+
+    // Legacy: Oferta activa (se mantiene temporalmente si es necesario)
     Optional<AcademicOffer> findByActiveTrue();
 
     // Desactiva todas las ofertas antes de activar una nueva (se usa en una transacción)

@@ -3,10 +3,10 @@ import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
-import { materiasData, getFacultades } from '../data/materiasData';
+import { scheduleApi, SubjectResponse, SubjectGroupResponse } from '../services/api';
 import { PromptModal, AlertModal } from '../components/Modal';
 import {
-  Search, X, AlertTriangle, Info, Save, BookOpen, Clock
+  Search, X, AlertTriangle, Save, Clock, Loader2
 } from 'lucide-react';
 
 const diasSemana = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -19,7 +19,7 @@ const COLORS = [
 interface SelectedGroup {
   nombre: string;
   codigo: string;
-  grupo: string;
+  grupo: string; // groupCode
   color: string;
   horarios: { dia: string; horaInicio: number; horaFin: number; ubicacion?: string }[];
 }
@@ -30,6 +30,8 @@ export default function PlannerPage() {
   const { user, isAuthenticated, updateUser } = useAuth();
   const T = useThemeTokens();
 
+  const [loading, setLoading] = useState(true);
+  const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedFacultad, setSelectedFacultad] = useState('');
   const [selected, setSelected] = useState<SelectedGroup[]>([]);
@@ -39,53 +41,58 @@ export default function PlannerPage() {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  // Handle edit schedule from profile page
   useEffect(() => {
-    const editSchedule = location.state?.editSchedule;
-    if (editSchedule && editSchedule.materias) {
-      const reconstructed: SelectedGroup[] = [];
-      let ci = 0;
-      editSchedule.materias.forEach((saved: any) => {
-        const materia = materiasData[saved.codigo];
-        if (!materia) return;
-        const grupo = materia.grupos.find((g) => g.grupo === saved.grupo);
-        if (!grupo) return;
-        reconstructed.push({
-          nombre: materia.nombre,
-          codigo: materia.codigo,
-          grupo: grupo.grupo,
-          color: saved.customHex || saved.color || COLORS[ci % COLORS.length],
-          horarios: grupo.horarios,
-        });
-        ci++;
-      });
-      setSelected(reconstructed);
-      setColorIdx(ci);
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
     }
-  }, [location.state]);
-
-  useEffect(() => {
-    if (!isAuthenticated) navigate('/login');
+    
+    scheduleApi.getOfferSubjects()
+      .then(res => setSubjects(res || []))
+      .catch(err => console.error("Error fetching subjects:", err))
+      .finally(() => setLoading(false));
   }, [isAuthenticated, navigate]);
 
-  const facultades = getFacultades();
+  // Handle edit schedule from profile page once subjects load
+  useEffect(() => {
+    if (subjects.length > 0 && location.state?.editSchedule) {
+      const editSchedule = location.state.editSchedule;
+      if (editSchedule && editSchedule.materias) {
+        const reconstructed: SelectedGroup[] = [];
+        let ci = 0;
+        editSchedule.materias.forEach((saved: any) => {
+          const materia = subjects.find(s => s.codigo === saved.codigo);
+          if (!materia) return;
+          const grupo = materia.grupos?.find((g) => g.grupoCode === saved.grupo);
+          if (!grupo) return;
+          reconstructed.push({
+            nombre: materia.nombre,
+            codigo: materia.codigo,
+            grupo: grupo.grupoCode,
+            color: saved.customHex || saved.color || COLORS[ci % COLORS.length],
+            horarios: grupo.horarios,
+          });
+          ci++;
+        });
+        setSelected(reconstructed);
+        setColorIdx(ci);
+      }
+    }
+  }, [subjects, location.state]);
+
+  const facultades = useMemo(() => Array.from(new Set(subjects.map(s => s.facultad).filter(Boolean))).sort(), [subjects]);
 
   const searchResults = useMemo(() => {
     const text = searchText.toLowerCase();
     if (!text && !selectedFacultad) return [];
-    return Object.values(materiasData)
+    return subjects
       .filter(m => {
         const matchText = !text || m.nombre.toLowerCase().includes(text) || m.codigo.includes(text);
         const matchFac = !selectedFacultad || m.facultad === selectedFacultad;
         return matchText && matchFac;
       })
       .slice(0, 15);
-  }, [searchText, selectedFacultad]);
-
-  const totalCreditos = selected.reduce((sum, s) => {
-    const mat = materiasData[s.codigo];
-    return sum + (mat?.creditos || 0);
-  }, 0);
+  }, [subjects, searchText, selectedFacultad]);
 
   const horasOcupadas: Record<string, { nombre: string; color: string }[]> = {};
   selected.forEach(s => {
@@ -100,14 +107,14 @@ export default function PlannerPage() {
     .filter(([, arr]) => arr.length > 1)
     .map(([key, arr]) => ({ key, materias: arr }));
 
-  const addGroup = (materia: typeof materiasData[string], grupo: typeof materiasData[string]['grupos'][number]) => {
+  const addGroup = (materia: SubjectResponse, grupo: SubjectGroupResponse) => {
     const existing = selected.find(s => s.codigo === materia.codigo);
     if (existing) {
       setConflictMsg(`"${materia.nombre}" ya está en tu horario.`);
       return;
     }
     const color = COLORS[colorIdx % COLORS.length];
-    const newItem: SelectedGroup = { nombre: materia.nombre, codigo: materia.codigo, grupo: grupo.grupo, color, horarios: grupo.horarios };
+    const newItem: SelectedGroup = { nombre: materia.nombre, codigo: materia.codigo, grupo: grupo.grupoCode, color, horarios: grupo.horarios };
 
     const hasConflict = grupo.horarios.some(h =>
       selected.some(s => s.horarios.some(sh => sh.dia === h.dia && sh.horaInicio < h.horaFin && sh.horaFin > h.horaInicio))
@@ -134,12 +141,19 @@ export default function PlannerPage() {
       setShowAlert(true);
       return;
     }
-    const mat = materiasData;
     const newHorario = {
       id: Date.now().toString(),
       nombre: name,
-      semestre: '2026-1',
-      materias: selected.map(s => ({ ...s, creditos: mat[s.codigo]?.creditos || 0, docente: mat[s.codigo]?.grupos.find(g => g.grupo === s.grupo)?.docente || '', customHex: s.color })),
+      semestre: 'Activo', // Would be better to get active semester name, but this works for now
+      materias: selected.map(s => {
+        const mat = subjects.find(sub => sub.codigo === s.codigo);
+        return { 
+          ...s, 
+          creditos: 0, 
+          docente: mat?.grupos?.find(g => g.grupoCode === s.grupo)?.docente || '', 
+          customHex: s.color 
+        };
+      }),
     };
     updateUser({ horariosGuardados: [...horarios, newHorario] });
     setShowAlert(true);
@@ -154,16 +168,9 @@ export default function PlannerPage() {
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
             <h1 style={{ color: T.text, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>Planeador de horarios</h1>
-            <p style={{ color: T.textMuted, fontSize: '14px', marginTop: '2px' }}>Arma tu horario ideal para 2026-1</p>
+            <p style={{ color: T.textMuted, fontSize: '14px', marginTop: '2px' }}>Arma tu horario ideal</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-              style={{ background: totalCreditos > 20 ? T.error.bg : T.accentGreen.bg, border: `1px solid ${totalCreditos > 20 ? T.error.border : T.accentGreen.border}` }}>
-              <BookOpen size={14} style={{ color: totalCreditos > 20 ? T.error.text : T.accentGreen.color }} />
-              <span style={{ color: totalCreditos > 20 ? T.error.text : T.accentGreen.color, fontSize: '13px', fontWeight: 600 }}>
-                {totalCreditos} cr.
-              </span>
-            </div>
             {selected.length > 0 && (
               <button onClick={() => setShowPrompt(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all"
@@ -193,14 +200,25 @@ export default function PlannerPage() {
           </div>
         )}
 
+        {conflictMsg && (
+          <div className="flex items-center gap-2 p-3 rounded-xl mb-5 animate-fade-in"
+            style={{ background: T.warning.bg, border: `1px solid ${T.warning.border}`, color: T.warning.text, fontSize: '13px', fontWeight: 500 }}>
+            <AlertTriangle size={14} />
+            {conflictMsg}
+            <button onClick={() => setConflictMsg('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: T.warning.text, cursor: 'pointer', padding: '2px' }}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Search panel */}
           <div className="lg:col-span-1">
-            <div className="p-4 rounded-2xl mb-4"
-              style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}>
+            <div className="p-4 rounded-2xl mb-4 flex flex-col h-full"
+              style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, maxHeight: '600px' }}>
               <h2 className="mb-3" style={{ color: T.text, fontWeight: 600, fontSize: '15px' }}>Agregar materias</h2>
 
-              <div className="relative mb-3">
+              <div className="relative mb-3 flex-shrink-0">
                 <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: T.inputIcon }} />
                 <input type="text" value={searchText} onChange={e => setSearchText(e.target.value)}
                   placeholder="Buscar materia..."
@@ -217,39 +235,57 @@ export default function PlannerPage() {
               </div>
 
               <select value={selectedFacultad} onChange={e => setSelectedFacultad(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl outline-none mb-3"
+                className="w-full px-3 py-2.5 rounded-xl outline-none mb-3 flex-shrink-0"
                 style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: selectedFacultad ? T.inputText : T.inputIcon, fontSize: '13px', appearance: 'none', cursor: 'pointer' }}>
                 <option value="">Todas las facultades</option>
                 {facultades.map(f => <option key={f} value={f} style={{ background: T.selectOptionBg }}>{f}</option>)}
               </select>
 
               {/* Search results */}
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {searchResults.map(materia => (
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 size={24} className="animate-spin" style={{ color: T.primary }} />
+                  </div>
+                ) : searchResults.map(materia => (
                   <div key={materia.codigo} className="p-3 rounded-xl"
                     style={{ background: T.cardBg2, border: `1px solid ${T.divider}` }}>
                     <p style={{ color: T.text, fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{materia.nombre}</p>
                     <p style={{ color: T.primary, fontSize: '10px', fontWeight: 600, marginBottom: '6px', fontFamily: 'JetBrains Mono, monospace' }}>
-                      {materia.codigo} · {materia.creditos} cr.
+                      {materia.codigo}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {materia.grupos.map(grupo => (
-                        <button key={grupo.grupo}
-                          onClick={() => addGroup(materia, grupo)}
-                          className="px-2 py-1 rounded-lg transition-all"
-                          style={{ background: T.primaryBg, border: `1px solid ${T.primaryBorder}`, color: T.primary, fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#C9344C'; e.currentTarget.style.color = 'white'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = T.primaryBg; e.currentTarget.style.color = T.primary; }}>
-                          G-{grupo.grupo}
-                        </button>
-                      ))}
+                      {materia.grupos?.map(grupo => {
+                        const hasConflict = grupo.horarios.some(h =>
+                          selected.some(s => s.horarios.some(sh => sh.dia === h.dia && sh.horaInicio < h.horaFin && sh.horaFin > h.horaInicio))
+                        );
+                        return (
+                          <button key={grupo.grupoCode}
+                            onClick={() => !hasConflict && addGroup(materia, grupo)}
+                            className="px-2 py-1 rounded-lg transition-all"
+                            title={hasConflict ? "Este grupo se cruza con tu horario actual" : ""}
+                            style={{ 
+                              background: hasConflict ? T.cardBg2 : T.primaryBg, 
+                              border: `1px solid ${hasConflict ? T.divider : T.primaryBorder}`, 
+                              color: hasConflict ? T.textMuted : T.primary, 
+                              fontSize: '11px', 
+                              fontWeight: 600, 
+                              cursor: hasConflict ? 'not-allowed' : 'pointer',
+                              opacity: hasConflict ? 0.6 : 1
+                            }}
+                            onMouseEnter={e => { if (!hasConflict) { e.currentTarget.style.background = '#C9344C'; e.currentTarget.style.color = 'white'; } }}
+                            onMouseLeave={e => { if (!hasConflict) { e.currentTarget.style.background = T.primaryBg; e.currentTarget.style.color = T.primary; } }}>
+                            G-{grupo.grupoCode}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
-                {(searchText || selectedFacultad) && searchResults.length === 0 && (
+                {!loading && (searchText || selectedFacultad) && searchResults.length === 0 && (
                   <p style={{ color: T.textSubtle, fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>Sin resultados</p>
                 )}
-                {!searchText && !selectedFacultad && (
+                {!loading && !searchText && !selectedFacultad && (
                   <p style={{ color: T.textSubtle, fontSize: '12px', textAlign: 'center', padding: '12px 0' }}>Escribe para buscar materias</p>
                 )}
               </div>
@@ -262,7 +298,7 @@ export default function PlannerPage() {
                 <h2 className="mb-3" style={{ color: T.text, fontWeight: 600, fontSize: '15px' }}>
                   Materias seleccionadas ({selected.length})
                 </h2>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {selected.map(s => {
                     const conflicted = conflictos.some(c => c.materias.some(m => m.nombre === s.nombre));
                     return (
@@ -300,7 +336,7 @@ export default function PlannerPage() {
               </div>
 
               {/* Hour rows */}
-              <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+              <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
                 {HORAS.map(hora => (
                   <div key={hora} className="grid" style={{ gridTemplateColumns: '56px repeat(6, 1fr)', minHeight: '48px' }}>
                     <div className="flex items-center justify-center px-2"
@@ -343,7 +379,7 @@ export default function PlannerPage() {
 
       <PromptModal isOpen={showPrompt} onClose={() => setShowPrompt(false)} onConfirm={name => { setShowPrompt(false); saveSchedule(name); }}
         title="Guardar horario" message="Dale un nombre a tu horario para identificarlo fácilmente."
-        placeholder="Ej: Horario 2026-1 preferido" defaultValue={`Horario 2026-1`} />
+        placeholder="Ej: Horario 2026-1 preferido" defaultValue={`Horario`} />
       <AlertModal isOpen={showAlert} onClose={() => setShowAlert(false)}
         title={alertMessage.includes('guardado') ? '¡Guardado!' : 'Límite alcanzado'}
         message={alertMessage} type={alertMessage.includes('guardado') ? 'success' : 'warning'} />
