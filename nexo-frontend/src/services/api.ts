@@ -131,6 +131,10 @@ export interface UserProfile {
   active: boolean;
   createdAt: string;
   roles: string[];
+  studentCode?: string;
+  entrySemester?: string;
+  faculty?: string;
+  career?: string;
 }
 
 export const userApi = {

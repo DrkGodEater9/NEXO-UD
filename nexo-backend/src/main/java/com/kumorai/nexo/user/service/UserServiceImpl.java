@@ -125,6 +125,14 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserProfileResponse toProfile(User user) {
+        String faculty = null;
+        String career = null;
+        if (user.getAcademicProgressList() != null && !user.getAcademicProgressList().isEmpty()) {
+            com.kumorai.nexo.academic.entity.StudyPlan plan = user.getAcademicProgressList().get(0).getStudyPlan();
+            faculty = plan.getFacultad();
+            career = plan.getNombre();
+        }
+
         return new UserProfileResponse(
                 user.getId(),
                 user.getEmail(),
@@ -132,7 +140,11 @@ public class UserServiceImpl implements UserService {
                 user.isActive(),
                 user.getCreatedAt(),
                 roleRepository.findByUserId(user.getId())
-                        .stream().map(r -> r.getRoleName().name()).toList()
+                        .stream().map(r -> r.getRoleName().name()).toList(),
+                user.getStudentCode(),
+                user.getEntrySemester(),
+                faculty,
+                career
         );
     }
 

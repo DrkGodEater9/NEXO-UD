@@ -9,5 +9,10 @@ public record UserProfileResponse(
         String nickname,
         boolean active,
         LocalDateTime createdAt,
-        List<String> roles
+        List<String> roles,
+        // Semantic student Info added below
+        String studentCode,
+        String entrySemester,
+        String faculty,
+        String career
 ) {}
