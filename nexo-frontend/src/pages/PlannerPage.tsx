@@ -312,7 +312,11 @@ export default function PlannerPage() {
     e.stopPropagation();
     if (colorPickerFor === codigo) { setColorPickerFor(null); return; }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setColorPickerPos({ top: rect.bottom + 6, left: rect.left });
+    const pickerH = 120; // approximate height of color picker
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow < pickerH + 12 ? rect.top - pickerH - 6 : rect.bottom + 6;
+    const left = Math.min(rect.left, window.innerWidth - 172);
+    setColorPickerPos({ top, left });
     setColorPickerFor(codigo);
   };
 
@@ -345,10 +349,10 @@ export default function PlannerPage() {
     const border1 = T.divider;
     const border2 = T.divider2;
 
-    // For export: only render hours and days that have content
+    // Trim hours and days to content range (both display and export)
     let horasToRender = HORAS;
     let diasToRender = diasSemana;
-    if (forExport && selected.length > 0) {
+    if (selected.length > 0) {
       const usedHoras = new Set<number>();
       const usedDias = new Set<string>();
       selected.forEach(s => s.horarios.forEach(h => {
@@ -356,11 +360,11 @@ export default function PlannerPage() {
         usedDias.add(h.dia);
       }));
       if (usedHoras.size > 0) {
-        const minH = Math.max(6, Math.min(...usedHoras) - 1);
+        const minH = Math.max(6, Math.min(...usedHoras));
         const maxH = Math.min(22, Math.max(...usedHoras) + 1);
         horasToRender = HORAS.filter(h => h >= minH && h <= maxH);
       }
-      if (usedDias.size > 0) {
+      if (usedDias.size > 0 && forExport) {
         diasToRender = diasSemana.filter(d => usedDias.has(d));
       }
     }
@@ -406,9 +410,9 @@ export default function PlannerPage() {
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'flex-start',
-                          padding: '3px 4px',
-                          background: `${item.color}${T.isDark ? '2a' : '1a'}`,
-                          border: `1.5px solid ${item.color}${isConflict ? '' : '99'}`,
+                          padding: '3px 5px',
+                          background: `color-mix(in srgb, ${item.color} 18%, #0d0d1a)`,
+                          border: `1.5px solid ${item.color}${isConflict ? '' : 'cc'}`,
                           outline: isConflict ? `2px solid ${T.error.text}` : 'none',
                           cursor: forExport ? 'default' : 'pointer',
                           overflow: 'hidden',
@@ -426,6 +430,7 @@ export default function PlannerPage() {
                           overflowWrap: 'break-word',
                           whiteSpace: 'normal',
                           display: 'block',
+                          filter: 'brightness(1.6) saturate(1.2)',
                         }}>
                           {item.nombre}
                         </span>
@@ -434,12 +439,13 @@ export default function PlannerPage() {
                           <span style={{
                             color: item.color,
                             fontSize: forExport ? '8px' : '7px',
-                            opacity: 0.8,
                             lineHeight: 1.2,
                             wordBreak: 'break-word',
                             overflowWrap: 'break-word',
                             whiteSpace: 'normal',
                             display: 'block',
+                            filter: 'brightness(1.4) saturate(1.1)',
+                            opacity: 0.9,
                           }}>
                             {sede}
                           </span>
@@ -449,13 +455,14 @@ export default function PlannerPage() {
                           <span style={{
                             color: item.color,
                             fontSize: forExport ? '8px' : '7px',
-                            opacity: 0.65,
                             lineHeight: 1.2,
                             fontWeight: 600,
                             wordBreak: 'break-word',
                             overflowWrap: 'break-word',
                             whiteSpace: 'normal',
                             display: 'block',
+                            filter: 'brightness(1.3) saturate(1.1)',
+                            opacity: 0.8,
                           }}>
                             {salon}
                           </span>
@@ -789,18 +796,24 @@ export default function PlannerPage() {
       {/* Block info modal */}
       {blockInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
           onClick={() => setBlockInfo(null)}>
           <div className="w-full max-w-md rounded-2xl p-5"
-            style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, maxHeight: '90vh', overflowY: 'auto' }}
+            style={{
+              background: T.isDark ? 'rgba(30,30,52,0.97)' : 'rgba(255,255,255,0.97)',
+              border: `1px solid ${blockInfo.item.color}55`,
+              boxShadow: `0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px ${blockInfo.item.color}22`,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-2" style={{ flex: 1, overflow: 'hidden', paddingRight: '8px' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: blockInfo.item.color, flexShrink: 0 }} />
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: blockInfo.item.color, flexShrink: 0, boxShadow: `0 0 8px ${blockInfo.item.color}` }} />
                 <h3 style={{ color: T.text, fontWeight: 700, fontSize: '15px', lineHeight: 1.3, wordBreak: 'break-word' }}>{blockInfo.item.nombre}</h3>
               </div>
               <button onClick={() => setBlockInfo(null)}
-                style={{ color: T.textSubtle, background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
+                style={{ color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
                 <X size={16} />
               </button>
             </div>
@@ -808,34 +821,34 @@ export default function PlannerPage() {
             <div className="flex flex-col gap-2 mb-4">
               {blockInfo.item.docente && (
                 <div className="flex gap-2 p-2.5 rounded-lg" style={{ background: T.cardBg2 }}>
-                  <Info size={13} style={{ color: T.textSubtle, flexShrink: 0, marginTop: '1px' }} />
+                  <Info size={13} style={{ color: T.textMuted, flexShrink: 0, marginTop: '1px' }} />
                   <div>
-                    <p style={{ color: T.textSubtle, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Docente</p>
+                    <p style={{ color: T.textMuted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Docente</p>
                     <p style={{ color: T.text, fontSize: '13px' }}>{blockInfo.item.docente}</p>
                   </div>
                 </div>
               )}
               <div className="flex gap-2 p-2.5 rounded-lg" style={{ background: T.cardBg2 }}>
-                <span style={{ color: T.textSubtle, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, width: '48px', flexShrink: 0, paddingTop: '1px' }}>Grupo</span>
+                <span style={{ color: T.textMuted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, width: '48px', flexShrink: 0, paddingTop: '1px' }}>Grupo</span>
                 <span style={{ color: T.text, fontSize: '13px', fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>G-{blockInfo.item.grupo}</span>
               </div>
             </div>
 
-            <p style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Sesiones</p>
+            <p style={{ color: T.textMuted, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Sesiones</p>
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${T.divider}` }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', background: T.cardBg2, padding: '8px 12px', gap: '4px' }}>
-                <span style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Día</span>
-                <span style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Horario</span>
-                <span style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Sede / Salón</span>
+                <span style={{ color: T.textMuted, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Día</span>
+                <span style={{ color: T.textMuted, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Horario</span>
+                <span style={{ color: T.textMuted, fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Sede / Salón</span>
               </div>
               {blockInfo.item.horarios.map((h, i) => {
                 const { sede, salon } = parseUbicacion(h.ubicacion || '');
                 return (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 100px 1fr', padding: '8px 12px', borderTop: `1px solid ${T.divider}`, gap: '8px', alignItems: 'start' }}>
-                    <span style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>{diasCortos[h.dia] || h.dia}</span>
+                    <span style={{ color: T.text, fontSize: '12px', fontWeight: 600 }}>{diasCortos[h.dia] || h.dia}</span>
                     <span style={{ color: T.text, fontSize: '12px' }}>{h.horaInicio}:00–{h.horaFin}:00</span>
                     <div>
-                      <p style={{ color: T.textSubtle, fontSize: '11px', wordBreak: 'break-word', margin: '0 0 2px 0' }}>{sede || '—'}</p>
+                      <p style={{ color: T.textMuted, fontSize: '11px', fontWeight: 500, wordBreak: 'break-word', margin: '0 0 2px 0' }}>{sede || '—'}</p>
                       <p style={{ color: T.text, fontSize: '12px', fontWeight: 600, wordBreak: 'break-word', margin: 0 }}>{salon || '—'}</p>
                     </div>
                   </div>

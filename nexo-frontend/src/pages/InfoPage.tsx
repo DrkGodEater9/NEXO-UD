@@ -12,6 +12,7 @@ import {
   welfareApi, WelfareData,
   announcementsApi, AnnouncementData
 } from '../services/api';
+import CampusMap from '../components/CampusMap';
 
 const calendarEvents = [
   { date: '15 abr', title: 'Inicio inscripciones 2026-1', type: 'primary' },
@@ -49,6 +50,7 @@ export default function InfoPage() {
   // ── API State ──────────────────────────────────────────────────────────────
   const [campusList, setCampusList] = useState<CampusData[]>([]);
   const [campusLoading, setCampusLoading] = useState(false);
+  const [selectedCampusId, setSelectedCampusId] = useState<number | null>(null);
 
   const [welfareList, setWelfareList] = useState<WelfareData[]>([]);
   const [welfareLoading, setWelfareLoading] = useState(false);
@@ -183,9 +185,9 @@ export default function InfoPage() {
           </div>
         )}
 
-        {/* ══════════════ Campus section — from API ══════════════ */}
+        {/* ══════════════ Campus section — mapa + tarjetas ══════════════ */}
         {activeSection === 'campus' && (
-          <div className="space-y-5">
+          <div>
             {campusLoading ? <LoadingSpinner /> : campusList.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -198,50 +200,68 @@ export default function InfoPage() {
                 </p>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-5">
+                {/* Mapa */}
+                <div className="rounded-2xl overflow-hidden"
+                  style={{ height: '420px', border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, position: 'relative' }}>
+                  <CampusMap
+                    campusList={campusList}
+                    selectedId={selectedCampusId}
+                    onSelect={id => setSelectedCampusId(prev => prev === id ? null : id)}
+                    isDark={T.isDark}
+                  />
+                </div>
+
+                {/* Tarjetas de sedes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {campusList.map(campus => {
-                    // Generate a color based on faculty name
-                    const colorPalette = ['#E8485F', '#818CF8', '#34D399', '#FBBF24', '#F472B6', '#22D3EE', '#A78BFA', '#FB923C'];
-                    const colorIdx = campus.name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colorPalette.length;
-                    const campusColor = colorPalette[colorIdx];
+                    const colorPalette = ['#E8485F', '#818CF8', '#34D399', '#FBBF24', '#F472B6', '#22D3EE', '#A78BFA', '#FB923C', '#2DD4BF', '#E879F9'];
+                    const campusColor = colorPalette[campus.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colorPalette.length];
+                    const isSelected = selectedCampusId === campus.id;
 
                     return (
-                      <div key={campus.id} className="p-4 rounded-2xl transition-all"
-                        style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = T.cardHoverShadow; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = T.cardShadow; }}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-3 h-3 rounded-full" style={{ background: campusColor }} />
-                          <h3 style={{ color: T.text, fontWeight: 600, fontSize: '14px' }}>{campus.name}</h3>
+                      <div key={campus.id}
+                        onClick={() => setSelectedCampusId(prev => prev === campus.id ? null : campus.id)}
+                        className="p-4 rounded-2xl cursor-pointer transition-all"
+                        style={{
+                          background: isSelected ? `color-mix(in srgb, ${campusColor} 12%, ${T.cardBg})` : T.cardBg,
+                          border: `1.5px solid ${isSelected ? campusColor + '88' : T.cardBorder}`,
+                          boxShadow: isSelected ? `0 0 0 1px ${campusColor}33, ${T.cardShadow}` : T.cardShadow,
+                        }}
+                        onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = T.cardHoverShadow; } }}
+                        onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = T.cardShadow; } }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div style={{
+                            width: '10px', height: '10px', borderRadius: '50%',
+                            background: campusColor,
+                            boxShadow: isSelected ? `0 0 8px ${campusColor}` : 'none',
+                            flexShrink: 0,
+                          }} />
+                          <h3 style={{ color: T.text, fontWeight: 600, fontSize: '13px', lineHeight: 1.4 }}>{campus.name}</h3>
                         </div>
                         {campus.address && (
                           <div className="flex items-start gap-1.5 mb-2">
-                            <MapPin size={12} style={{ color: T.textSubtle, marginTop: '2px', flexShrink: 0 }} />
-                            <p style={{ color: T.textMuted, fontSize: '12px', lineHeight: 1.5 }}>{campus.address}</p>
+                            <MapPin size={11} style={{ color: T.textMuted, marginTop: '2px', flexShrink: 0 }} />
+                            <p style={{ color: T.textMuted, fontSize: '11px', lineHeight: 1.5 }}>{campus.address}</p>
                           </div>
                         )}
-                        <p style={{ color: T.textMuted, fontSize: '11px', marginBottom: '8px' }}>
-                          Facultad: {campus.faculty}
-                        </p>
-                        {campus.classrooms && campus.classrooms.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
                           <span className="px-2 py-0.5 rounded-full"
-                            style={{ background: T.accentGreen.bg, color: T.accentGreen.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${T.accentGreen.border}` }}>
-                            {campus.classrooms.length} salón{campus.classrooms.length !== 1 ? 'es' : ''}
+                            style={{ background: `${campusColor}18`, color: campusColor, fontSize: '10px', fontWeight: 600, border: `1px solid ${campusColor}33` }}>
+                            {campus.faculty}
                           </span>
-                        )}
-                        {campus.mapUrl && (
-                          <a href={campus.mapUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1 mt-2"
-                            style={{ color: T.link, fontSize: '11px', fontWeight: 500, textDecoration: 'none' }}>
-                            <ExternalLink size={10} /> Ver en mapa
-                          </a>
-                        )}
+                          {campus.classrooms && campus.classrooms.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full"
+                              style={{ background: T.accentGreen.bg, color: T.accentGreen.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${T.accentGreen.border}` }}>
+                              {campus.classrooms.length} salón{campus.classrooms.length !== 1 ? 'es' : ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
