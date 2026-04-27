@@ -1,0 +1,34 @@
+{
+  "properties": [
+    {
+      "name": "nexo.jwt.secret",
+      "type": "java.lang.String",
+      "description": "JWT Secret Key for signing tokens."
+    },
+    {
+      "name": "nexo.jwt.expiration-ms",
+      "type": "java.lang.Long",
+      "description": "JWT Expiration time in milliseconds."
+    },
+    {
+      "name": "nexo.verification.code-ttl-minutes",
+      "type": "java.lang.Integer",
+      "description": "Time-to-live for verification codes in minutes."
+    },
+    {
+      "name": "nexo.verification.max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of allowed verification attempts."
+    },
+    {
+      "name": "nexo.upload.dir",
+      "type": "java.lang.String",
+      "description": "Directory path for saving uploaded files (like photos)."
+    },
+    {
+      "name": "nexo.cors.allowed-origins",
+      "type": "java.util.List<java.lang.String>",
+      "description": "List of allowed origins for CORS configuration."
+    }
+  ]
+}
