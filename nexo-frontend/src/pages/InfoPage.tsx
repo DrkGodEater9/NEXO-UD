@@ -7,21 +7,24 @@ import {
   MapPin, Calendar, Heart, BookOpen, Megaphone, ChevronRight,
   Clock, ArrowLeft, Loader2, ExternalLink
 } from 'lucide-react';
+
 import {
   campusApi, CampusData,
   welfareApi, WelfareData,
-  announcementsApi, AnnouncementData
+  announcementsApi, AnnouncementData,
+  calendarApi, CalendarEventData, CalendarEventType,
 } from '../services/api';
 import CampusMap from '../components/CampusMap';
 
-const calendarEvents = [
-  { date: '15 abr', title: 'Inicio inscripciones 2026-1', type: 'primary' },
-  { date: '22 abr', title: 'Cierre inscripciones', type: 'danger' },
-  { date: '28 abr', title: 'Inicio clases 2026-1', type: 'success' },
-  { date: '15 may', title: 'Festivo — Día del Trabajo', type: 'warning' },
-  { date: '25 jun', title: 'Paro estudiantil (tentativo)', type: 'warning' },
-  { date: '30 jun', title: 'Parciales primer corte', type: 'primary' },
-];
+const CALENDAR_TYPE_TO_DISPLAY: Record<CalendarEventType, { label: string; type: 'primary' | 'danger' | 'success' | 'warning' }> = {
+  INSCRIPCION:   { label: 'Inscripción',       type: 'primary' },
+  INICIO_CLASES: { label: 'Inicio de clases',  type: 'success' },
+  FIN_CLASES:    { label: 'Fin de clases',     type: 'danger' },
+  PARCIAL:       { label: 'Parcial',           type: 'primary' },
+  FESTIVO:       { label: 'Festivo',           type: 'warning' },
+  PARO:          { label: 'Paro',              type: 'warning' },
+  OTRO:          { label: 'Otro',              type: 'primary' },
+};
 
 const sgaSteps = [
   { n: '1', title: 'Accede al portal SGA', desc: 'Ingresa a sga.udistrital.edu.co con tu código estudiantil y contraseña institucional.' },
@@ -43,7 +46,7 @@ const infoCards = [
 
 export default function InfoPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isRestoring } = useAuth();
   const T = useThemeTokens();
   const [activeSection, setActiveSection] = useState<Section>(null);
 
@@ -58,9 +61,13 @@ export default function InfoPage() {
   const [announcementsList, setAnnouncementsList] = useState<AnnouncementData[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
 
+  const [calendarList, setCalendarList] = useState<CalendarEventData[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
   useEffect(() => {
+    if (isRestoring) return;
     if (!isAuthenticated) navigate('/login');
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isRestoring, navigate]);
 
   // ── Fetch data when a section opens ─────────────────────────────────────────
   const fetchCampus = useCallback(async () => {
@@ -90,11 +97,21 @@ export default function InfoPage() {
     finally { setAnnouncementsLoading(false); }
   }, []);
 
+  const fetchCalendar = useCallback(async () => {
+    setCalendarLoading(true);
+    try {
+      const data = await calendarApi.list();
+      setCalendarList(data);
+    } catch { /* silent */ }
+    finally { setCalendarLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (activeSection === 'campus' && campusList.length === 0) fetchCampus();
     if (activeSection === 'welfare' && welfareList.length === 0) fetchWelfare();
     if (activeSection === 'notices' && announcementsList.length === 0) fetchAnnouncements();
-  }, [activeSection, campusList.length, welfareList.length, announcementsList.length, fetchCampus, fetchWelfare, fetchAnnouncements]);
+    if (activeSection === 'calendar' && calendarList.length === 0) fetchCalendar();
+  }, [activeSection, campusList.length, welfareList.length, announcementsList.length, calendarList.length, fetchCampus, fetchWelfare, fetchAnnouncements, fetchCalendar]);
 
   const typeColors = {
     primary: { bg: T.accentIndigo.bg, border: T.accentIndigo.border, text: T.accentIndigo.color },
@@ -118,7 +135,7 @@ export default function InfoPage() {
     SERVICIOS_SALUD: 'Servicios de salud',
   };
 
-  const welfareCategoryAccent: Record<string, typeof T.accentYellow> = {
+  const welfareCategoryAccent: Record<string, { color: string; bg: string; border: string }> = {
     APOYO_ALIMENTARIO: T.accentYellow,
     BECAS: T.accentGreen,
     SALUD_MENTAL: T.accentPink,
@@ -266,25 +283,46 @@ export default function InfoPage() {
           </div>
         )}
 
-        {/* Calendar section */}
+        {/* Calendar section — API-driven */}
         {activeSection === 'calendar' && (
-          <div className="space-y-3">
-            {calendarEvents.map(({ date, title, type }) => {
-              const c = typeColors[type as keyof typeof typeColors];
-              return (
-                <div key={title} className="flex items-center gap-4 p-4 rounded-xl transition-all"
-                  style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(4px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(0)'; }}>
-                  <div className="w-16 text-center px-2 py-1 rounded-lg flex-shrink-0"
-                    style={{ background: c.bg, border: `1px solid ${c.border}` }}>
-                    <span style={{ color: c.text, fontSize: '12px', fontWeight: 700 }}>{date}</span>
-                  </div>
-                  <p style={{ color: T.text, fontSize: '14px', fontWeight: 500 }}>{title}</p>
-                  <div className="ml-auto w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.text }} />
+          <div>
+            {calendarLoading ? <LoadingSpinner /> : calendarList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  style={{ background: T.accentIndigo.bg, border: `1px solid ${T.accentIndigo.border}` }}>
+                  <Calendar size={24} style={{ color: T.accentIndigo.color }} />
                 </div>
-              );
-            })}
+                <p style={{ color: T.text, fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Sin eventos registrados</p>
+                <p style={{ color: T.textMuted, fontSize: '14px', textAlign: 'center', maxWidth: '300px' }}>
+                  Los eventos del calendario académico aparecerán aquí cuando un radicador los registre.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[...calendarList].sort((a, b) => a.startDate.localeCompare(b.startDate)).map(event => {
+                  const display = CALENDAR_TYPE_TO_DISPLAY[event.eventType] ?? CALENDAR_TYPE_TO_DISPLAY.OTRO;
+                  const c = typeColors[display.type];
+                  const dateObj = new Date(event.startDate + 'T00:00:00');
+                  const dateLabel = dateObj.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+                  return (
+                    <div key={event.id} className="flex items-center gap-4 p-4 rounded-xl transition-all"
+                      style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(4px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(0)'; }}>
+                      <div className="w-16 text-center px-2 py-1 rounded-lg flex-shrink-0"
+                        style={{ background: c.bg, border: `1px solid ${c.border}` }}>
+                        <span style={{ color: c.text, fontSize: '12px', fontWeight: 700 }}>{dateLabel}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p style={{ color: T.text, fontSize: '14px', fontWeight: 500 }}>{event.title}</p>
+                        <span style={{ color: c.text, fontSize: '11px', fontWeight: 600 }}>{display.label}</span>
+                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.text }} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

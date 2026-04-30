@@ -13,6 +13,8 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ManageAnnouncementsPage from "./pages/ManageAnnouncementsPage";
 import ManageWelfarePage from "./pages/ManageWelfarePage";
 import ManageCampusPage from "./pages/ManageCampusPage";
+import ManagePage from "./pages/ManagePage";
+import ManageCalendarPage from "./pages/ManageCalendarPage";
 
 export const router = createBrowserRouter([
   {
@@ -60,6 +62,10 @@ export const router = createBrowserRouter([
     Component: AdminDashboardPage,
   },
   {
+    path: "/manage",
+    Component: ManagePage,
+  },
+  {
     path: "/manage/announcements",
     Component: ManageAnnouncementsPage,
   },
@@ -70,5 +76,9 @@ export const router = createBrowserRouter([
   {
     path: "/manage/campus",
     Component: ManageCampusPage,
+  },
+  {
+    path: "/manage/calendar",
+    Component: ManageCalendarPage,
   },
 ]);

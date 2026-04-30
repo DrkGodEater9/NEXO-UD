@@ -34,7 +34,7 @@ const makeIcon = (color: string) =>
     popupAnchor: [0, -36],
   });
 
-// Dark map tiles — CartoDB Dark Matter, no API key required
+// CartoDB Dark Matter — oscuro base, aclarado con CSS filter en el contenedor
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const TILE_ATTR = '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>';
 
@@ -125,6 +125,10 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
   return (
     <>
       <style>{`
+        /* Aclarar las tiles del mapa con tinte azul-gris sin afectar marcadores ni controles */
+        .nexo-map .leaflet-tile-pane {
+          filter: brightness(1.55) contrast(0.88) saturate(0.7) hue-rotate(195deg);
+        }
         .nexo-popup .leaflet-popup-content-wrapper {
           background: #1a1a2e;
           border: 1px solid rgba(255,255,255,0.12);
@@ -147,7 +151,7 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
         }
         .leaflet-control-attribution a { color: #888 !important; }
       `}</style>
-      <div ref={containerRef} style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
+      <div ref={containerRef} className="nexo-map" style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
     </>
   );
 }

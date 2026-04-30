@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, Calendar, Search, Info, User, LogOut,
-  ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
-  Shield, Megaphone, Heart, MapPin
+  ChevronLeft, ChevronRight, Menu, X, Sun, Moon, Shield
 } from 'lucide-react';
 import { ConfirmModal } from './Modal';
 
@@ -17,20 +16,16 @@ const baseNavItems = [
   { path: '/profile', label: 'Mi Perfil', icon: User },
 ];
 
+const RADICADOR_ROLES = ['RADICADOR_AVISOS', 'RADICADOR_BIENESTAR', 'RADICADOR_SEDES', 'RADICADOR_CALENDARIO'];
+
 function getNavItems(roles: string[]) {
   const items = [...baseNavItems];
-  const extras: typeof baseNavItems = [];
 
   if (roles.includes('ADMINISTRADOR'))
-    extras.push({ path: '/admin', label: 'Administración', icon: Shield });
-  if (roles.includes('RADICADOR_AVISOS'))
-    extras.push({ path: '/manage/announcements', label: 'Gestionar Avisos', icon: Megaphone });
-  if (roles.includes('RADICADOR_BIENESTAR'))
-    extras.push({ path: '/manage/welfare', label: 'Gestionar Bienestar', icon: Heart });
-  if (roles.includes('RADICADOR_SEDES'))
-    extras.push({ path: '/manage/campus', label: 'Gestionar Sedes', icon: MapPin });
+    items.push({ path: '/admin', label: 'Administración', icon: Shield });
+  else if (RADICADOR_ROLES.some(r => roles.includes(r)))
+    items.push({ path: '/manage', label: 'Administración', icon: Shield });
 
-  if (extras.length > 0) items.push(...extras);
   return items;
 }
 
@@ -88,7 +83,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundImage: bgMain, backgroundAttachment: 'fixed', backgroundColor: bgMainColor }}>
+    <div className="min-h-screen flex" style={isDark ? { backgroundImage: bgMain, backgroundAttachment: 'fixed', backgroundColor: bgMainColor } : { backgroundColor: bgMainColor }}>
       {/* Desktop Sidebar */}
       <aside
         className={`hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-300 ease-out`}

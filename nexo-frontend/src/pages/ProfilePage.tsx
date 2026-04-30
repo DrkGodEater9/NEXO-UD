@@ -30,7 +30,7 @@ const getCourseColor = (materia: MateriasPensum): string => {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, updateUser } = useAuth();
+  const { user, isAuthenticated, isRestoring, updateUser } = useAuth();
   const T = useThemeTokens();
   const [activeTab, setActiveTab] = useState<'pensum' | 'horarios'>('pensum');
   const [scheduleViewerOpen, setScheduleViewerOpen] = useState(false);
@@ -39,14 +39,11 @@ export default function ProfilePage() {
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, user, navigate]);
+    if (isRestoring) return;
+    if (!isAuthenticated || !user) navigate('/login');
+  }, [isAuthenticated, isRestoring, user, navigate]);
 
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  if (isRestoring || !isAuthenticated || !user) return null;
 
   const totalCreditosPensum = getTotalCreditosPensum();
   const creditosAprobados = getTotalCreditos(user.materiasVistas || []);

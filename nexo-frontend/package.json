@@ -45,7 +45,7 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.55.0",
-    "react-leaflet": "^4.2.1",
+    "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.7",
     "react-router": "*",
     "recharts": "^2.15.2",
@@ -57,10 +57,11 @@
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
     "@types/node": "^20.10.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "tailwindcss": "4.1.12",
+    "typescript": "^6.0.3",
     "vite": "6.3.5"
   },
   "scripts": {

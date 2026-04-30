@@ -186,9 +186,11 @@ function ForgotPasswordModal({ onClose, T }: { onClose: () => void; T: ReturnTyp
 
 // ─── Login Page ───────────────────────────────────────────────────────────────
 
+const QUICK_STORAGE_KEY = 'nexoud_quick_schedule';
+
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, updateUser } = useAuth();
   const T = useThemeTokens();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -206,6 +208,24 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(formData.email, formData.password);
+
+      // Restore quick-mode schedule (from sessionStorage direct flow, or localStorage after register+verify)
+      const quickRaw = sessionStorage.getItem(QUICK_STORAGE_KEY) || localStorage.getItem(QUICK_STORAGE_KEY);
+      if (quickRaw) {
+        try {
+          const quick = JSON.parse(quickRaw);
+          const newH = { id: Date.now().toString(), nombre: 'Horario modo rápido', semestre: 'Activo', materias: quick.materias };
+          updateUser({ horariosGuardados: [newH] });
+          sessionStorage.removeItem(QUICK_STORAGE_KEY);
+          localStorage.removeItem(QUICK_STORAGE_KEY);
+          navigate('/planner', { state: { editSchedule: newH } });
+          return;
+        } catch {
+          sessionStorage.removeItem(QUICK_STORAGE_KEY);
+          localStorage.removeItem(QUICK_STORAGE_KEY);
+        }
+      }
+
       navigate('/dashboard');
     } catch (err) {
       setError(

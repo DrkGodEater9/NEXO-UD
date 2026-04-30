@@ -10,7 +10,7 @@ const FRANJAS = ['Mañana (6-12h)', 'Tarde (12-18h)', 'Noche (18-22h)'];
 
 export default function SearchPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isRestoring } = useAuth();
   const T = useThemeTokens();
   
   const [loading, setLoading] = useState(true);
@@ -23,17 +23,18 @@ export default function SearchPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    if (isRestoring) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    
+
     // Fetch subjects from backend
     scheduleApi.getOfferSubjects()
       .then(res => setSubjects(res || []))
       .catch(err => console.error("Error fetching subjects:", err))
       .finally(() => setLoading(false));
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isRestoring, navigate]);
 
   const facultades = useMemo(() => Array.from(new Set(subjects.map(s => s.facultad).filter(Boolean))).sort(), [subjects]);
   const carreras = useMemo(() => Array.from(new Set(subjects.filter(s => !selectedFacultad || s.facultad === selectedFacultad).map(s => s.carrera).filter(Boolean))).sort(), [subjects, selectedFacultad]);

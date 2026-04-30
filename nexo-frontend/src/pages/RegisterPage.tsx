@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, useLocation, Link } from 'react-router';
 import { useAuth, ApiError } from '../context/AuthContext';
 import { useThemeTokens } from '../context/useThemeTokens';
 import { User, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, Sun, Moon, Hash, GraduationCap, Calendar, Building2, BookOpen } from 'lucide-react';
@@ -257,8 +257,11 @@ function StudentInfoCard({ parsed, T, visible }: {
 
 // ─── Main Register Page ──────────────────────────────────────────────────────
 
+const QUICK_STORAGE_KEY = 'nexoud_quick_schedule';
+
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register } = useAuth();
   const T = useThemeTokens();
 
@@ -311,6 +314,14 @@ export default function RegisterPage() {
         studentCode: formData.studentCode,
       });
       localStorage.setItem('pending_verification', JSON.stringify({ email: formData.correo }));
+      // If came from quick mode, move schedule to localStorage so it survives email verification
+      if (location.state?.returnAfterLogin) {
+        const quickRaw = sessionStorage.getItem(QUICK_STORAGE_KEY);
+        if (quickRaw) {
+          localStorage.setItem(QUICK_STORAGE_KEY, quickRaw);
+          sessionStorage.removeItem(QUICK_STORAGE_KEY);
+        }
+      }
       navigate('/verify-email');
     } catch (err) {
       setError(

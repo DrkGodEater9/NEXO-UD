@@ -15,7 +15,10 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return (localStorage.getItem('nexoud-theme') as Theme) || 'dark';
+      const stored = (localStorage.getItem('nexoud-theme') as Theme) || 'dark';
+      // Apply synchronously so the first paint already has the right data-theme
+      document.documentElement.setAttribute('data-theme', stored);
+      return stored;
     } catch {
       return 'dark';
     }

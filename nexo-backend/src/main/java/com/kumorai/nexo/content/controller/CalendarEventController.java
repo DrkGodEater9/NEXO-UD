@@ -38,7 +38,7 @@ public class CalendarEventController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('RADICADOR_CALENDARIO')")
     public ResponseEntity<CalendarEventResponse> create(@Valid @RequestBody CalendarEventRequest request,
                                                         @AuthenticationPrincipal String email) {
         Long createdBy = userService.getMyProfile(email).id();
@@ -46,14 +46,14 @@ public class CalendarEventController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('RADICADOR_CALENDARIO')")
     public ResponseEntity<CalendarEventResponse> update(@PathVariable Long id,
                                                         @Valid @RequestBody CalendarEventRequest request) {
         return ResponseEntity.ok(calendarEventService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or hasRole('RADICADOR_CALENDARIO')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         calendarEventService.delete(id);
         return ResponseEntity.noContent().build();

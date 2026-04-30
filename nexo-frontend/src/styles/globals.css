@@ -638,6 +638,7 @@ html {
 
 [data-theme="light"] body {
   background: #F5F5F7;
+  background-image: none;
   color: var(--text-1);
 }
 

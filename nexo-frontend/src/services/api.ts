@@ -442,3 +442,48 @@ export const campusApi = {
     return request<void>(`/campus/${id}`, { method: 'DELETE' });
   },
 };
+
+// ─── Academic Calendar ────────────────────────────────────────────────────────
+
+export type CalendarEventType = 'INSCRIPCION' | 'INICIO_CLASES' | 'FIN_CLASES' | 'PARCIAL' | 'FESTIVO' | 'PARO' | 'OTRO';
+
+// Matches CalendarEventResponse from backend
+export interface CalendarEventData {
+  id: number;
+  title: string;
+  description: string | null;
+  eventType: CalendarEventType;
+  startDate: string;
+  endDate: string | null;
+  createdBy: number;
+}
+
+// Matches CalendarEventRequest from backend
+export interface CalendarEventPayload {
+  title: string;
+  description?: string;
+  eventType: CalendarEventType;
+  startDate: string;
+  endDate?: string;
+}
+
+export const calendarApi = {
+  list() {
+    return request<CalendarEventData[]>('/calendar');
+  },
+  create(data: CalendarEventPayload) {
+    return request<CalendarEventData>('/calendar', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update(id: number, data: CalendarEventPayload) {
+    return request<CalendarEventData>(`/calendar/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete(id: number) {
+    return request<void>(`/calendar/${id}`, { method: 'DELETE' });
+  },
+};

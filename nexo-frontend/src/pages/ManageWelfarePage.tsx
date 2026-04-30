@@ -22,7 +22,7 @@ const categoryColors: Record<string, (T: any) => any> = {
 
 export default function ManageWelfarePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isRestoring } = useAuth();
   const T = useThemeTokens();
   const [items, setItems] = useState<WelfareData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,9 +33,10 @@ export default function ManageWelfarePage() {
   const canAccess = user?.roles.includes('RADICADOR_BIENESTAR') || user?.roles.includes('ADMINISTRADOR');
 
   useEffect(() => {
+    if (isRestoring) return;
     if (!isAuthenticated) navigate('/login');
     if (user && !canAccess) navigate('/dashboard');
-  }, [isAuthenticated, user, navigate, canAccess]);
+  }, [isAuthenticated, isRestoring, user, navigate, canAccess]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -46,7 +47,7 @@ export default function ManageWelfarePage() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  if (!isAuthenticated || !user || !canAccess) return null;
+  if (isRestoring || !isAuthenticated || !user || !canAccess) return null;
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar este contenido?')) return;

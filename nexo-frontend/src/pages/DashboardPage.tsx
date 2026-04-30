@@ -19,12 +19,13 @@ function getGreeting(name: string): string {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isRestoring } = useAuth();
   const T = useThemeTokens();
 
   useEffect(() => {
+    if (isRestoring) return;
     if (!isAuthenticated) navigate('/login');
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isRestoring, navigate]);
 
   const [welfareItems, setWelfareItems] = useState<WelfareData[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementData[]>([]);

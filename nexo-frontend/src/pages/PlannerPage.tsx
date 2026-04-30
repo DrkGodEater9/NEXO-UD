@@ -862,10 +862,10 @@ export default function PlannerPage() {
       {/* Export modal */}
       {showExport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
           onClick={() => !exporting && setShowExport(false)}>
           <div className="w-full max-w-xs rounded-2xl p-6"
-            style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
+            style={{ background: T.isDark ? 'rgba(30,30,52,0.97)' : 'rgba(255,255,255,0.97)', border: `1px solid ${T.cardBorder}`, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 style={{ color: T.text, fontWeight: 700, fontSize: '16px' }}>Exportar horario</h3>

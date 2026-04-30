@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import L from 'leaflet';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
@@ -15,9 +17,10 @@ import {
   welfareApi, WelfareData, WelfarePayload,
   campusApi, CampusData, CampusPayload,
   semesterApi, SemesterData,
+  calendarApi, CalendarEventData, CalendarEventPayload, CalendarEventType,
 } from '../services/api';
 
-type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus';
+type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus' | 'calendar';
 
 const sidebarSections: { key: Section; label: string; icon: typeof Database }[] = [
   { key: 'config', label: 'Configuración', icon: Settings },
@@ -26,20 +29,22 @@ const sidebarSections: { key: Section; label: string; icon: typeof Database }[] 
   { key: 'announcements', label: 'Avisos Generales', icon: Megaphone },
   { key: 'welfare', label: 'Bienestar', icon: Heart },
   { key: 'campus', label: 'Sedes', icon: MapPin },
+  { key: 'calendar', label: 'Calendario', icon: Calendar },
 ];
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isRestoring } = useAuth();
   const T = useThemeTokens();
   const [section, setSection] = useState<Section>('config');
 
   useEffect(() => {
+    if (isRestoring) return;
     if (!isAuthenticated) navigate('/login');
     if (user && !user.roles.includes('ADMINISTRADOR')) navigate('/dashboard');
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, isRestoring, user, navigate]);
 
-  if (!isAuthenticated || !user || !user.roles.includes('ADMINISTRADOR')) return null;
+  if (isRestoring || !isAuthenticated || !user || !user.roles.includes('ADMINISTRADOR')) return null;
 
   return (
     <AppLayout>
@@ -110,6 +115,7 @@ export default function AdminDashboardPage() {
           {section === 'announcements' && <AnnouncementsSection T={T} />}
           {section === 'welfare' && <WelfareSection T={T} />}
           {section === 'campus' && <CampusSection T={T} />}
+          {section === 'calendar' && <CalendarSection T={T} />}
         </div>
       </div>
     </AppLayout>
@@ -944,18 +950,159 @@ function CampusSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
   );
 }
 
+// ── Leaflet icon fix (runs once at module level) ─────────────────────────────
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const CAMPUS_PIN_ICON = L.divIcon({
+  className: '',
+  html: `<div style="
+    width:28px;height:28px;border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    background:#C9344C;
+    border:3px solid rgba(255,255,255,0.9);
+    box-shadow:0 4px 14px rgba(0,0,0,0.5),0 0 0 3px #C9344C44;
+  "></div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
+  popupAnchor: [0, -32],
+});
+
+function CampusMapPicker({ lat, lng, onChange }: {
+  lat: number | null;
+  lng: number | null;
+  onChange: (lat: number, lng: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center: lat && lng ? [lat, lng] : [4.610000, -74.082000],
+      zoom: lat && lng ? 15 : 12,
+      zoomControl: false,
+      attributionControl: false,
+    });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map);
+
+    if (lat && lng) {
+      markerRef.current = L.marker([lat, lng], { icon: CAMPUS_PIN_ICON, draggable: true }).addTo(map);
+      markerRef.current.on('dragend', () => {
+        const pos = markerRef.current!.getLatLng();
+        onChange(parseFloat(pos.lat.toFixed(6)), parseFloat(pos.lng.toFixed(6)));
+      });
+    }
+
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const rounded: [number, number] = [
+        parseFloat(e.latlng.lat.toFixed(6)),
+        parseFloat(e.latlng.lng.toFixed(6)),
+      ];
+      if (markerRef.current) {
+        markerRef.current.setLatLng(rounded);
+      } else {
+        markerRef.current = L.marker(rounded, { icon: CAMPUS_PIN_ICON, draggable: true }).addTo(map);
+        markerRef.current.on('dragend', () => {
+          const pos = markerRef.current!.getLatLng();
+          onChange(parseFloat(pos.lat.toFixed(6)), parseFloat(pos.lng.toFixed(6)));
+        });
+      }
+      onChange(rounded[0], rounded[1]);
+    });
+
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || lat === null || lng === null) return;
+    const pos: [number, number] = [lat, lng];
+    if (markerRef.current) {
+      markerRef.current.setLatLng(pos);
+    } else {
+      markerRef.current = L.marker(pos, { icon: CAMPUS_PIN_ICON, draggable: true }).addTo(mapRef.current);
+      markerRef.current.on('dragend', () => {
+        const p = markerRef.current!.getLatLng();
+        onChange(parseFloat(p.lat.toFixed(6)), parseFloat(p.lng.toFixed(6)));
+      });
+    }
+    mapRef.current.setView(pos, Math.max(mapRef.current.getZoom(), 14), { animate: true });
+  }, [lat, lng]);
+
+  return (
+    <>
+      <style>{`
+        .nexo-admin-picker .leaflet-tile-pane {
+          filter: brightness(1.55) contrast(0.88) saturate(0.7) hue-rotate(195deg);
+        }
+        .nexo-admin-picker .leaflet-control-zoom a {
+          background: rgba(22,22,42,0.95) !important;
+          color: #aaa !important;
+          border-color: rgba(255,255,255,0.12) !important;
+        }
+        .nexo-admin-picker .leaflet-control-zoom a:hover { color: #fff !important; }
+      `}</style>
+      <div
+        ref={containerRef}
+        className="nexo-admin-picker"
+        style={{ width: '100%', height: '200px', borderRadius: '10px', cursor: 'crosshair' }}
+      />
+    </>
+  );
+}
+
 function CampusForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof useThemeTokens>; initial: CampusData | null; onSave: (d: CampusPayload) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [faculty, setFaculty] = useState(initial?.faculty ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
-  const [mapUrl, setMapUrl] = useState(initial?.mapUrl ?? '');
+  const [lat, setLat] = useState<number | null>(initial?.latitude ?? null);
+  const [lng, setLng] = useState<number | null>(initial?.longitude ?? null);
+  const [latInput, setLatInput] = useState(initial?.latitude?.toString() ?? '');
+  const [lngInput, setLngInput] = useState(initial?.longitude?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const inputStyle = { background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' };
+  const labelStyle = { color: T.textMuted, fontSize: '12px', fontWeight: 600 as const, marginBottom: '5px', display: 'block' as const };
+
+  const handleMapChange = (newLat: number, newLng: number) => {
+    setLat(newLat); setLng(newLng);
+    setLatInput(newLat.toString()); setLngInput(newLng.toString());
+  };
+
+  const handleLatInput = (val: string) => {
+    setLatInput(val);
+    const n = parseFloat(val);
+    if (!isNaN(n)) setLat(n);
+  };
+
+  const handleLngInput = (val: string) => {
+    setLngInput(val);
+    const n = parseFloat(val);
+    if (!isNaN(n)) setLng(n);
+  };
+
   const handleSubmit = async () => {
     if (!name.trim() || !faculty.trim()) { setError('Nombre y facultad son obligatorios.'); return; }
+    const parsedLat = latInput ? parseFloat(latInput) : undefined;
+    const parsedLng = lngInput ? parseFloat(lngInput) : undefined;
+    if ((latInput && isNaN(parsedLat!)) || (lngInput && isNaN(parsedLng!))) {
+      setError('Latitud y longitud deben ser números válidos.'); return;
+    }
     setSaving(true); setError(null);
-    try { await onSave({ name, faculty, address: address || undefined, mapUrl: mapUrl || undefined }); }
+    try { await onSave({ name, faculty, address: address || undefined, latitude: parsedLat, longitude: parsedLng }); }
     catch (e: any) { setError(e.message || 'Error guardando'); setSaving(false); }
   };
 
@@ -966,10 +1113,42 @@ function CampusForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof use
         <button onClick={onCancel} style={{ color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
       </div>
       <div className="space-y-3">
-        <FormInput label="Nombre" value={name} onChange={setName} T={T} placeholder="Ej: Sede Macarena A" />
-        <FormInput label="Facultad" value={faculty} onChange={setFaculty} T={T} placeholder="Ej: Ingeniería" />
-        <FormInput label="Dirección (opcional)" value={address} onChange={setAddress} T={T} />
-        <FormInput label="URL del Mapa (opcional)" value={mapUrl} onChange={setMapUrl} T={T} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label style={labelStyle}>Nombre <span style={{ color: '#E8485F' }}>*</span></label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Sede Macarena A" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Facultad <span style={{ color: '#E8485F' }}>*</span></label>
+            <input type="text" value={faculty} onChange={e => setFaculty(e.target.value)} placeholder="Ej: Ingeniería" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
+          </div>
+        </div>
+        <div>
+          <label style={labelStyle}>Dirección</label>
+          <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ej: Calle 40 Sur No. 8B-84" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>
+            <MapPin size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+            Ubicación en el mapa
+          </label>
+          <div style={{ border: `1px solid ${T.inputBorder}`, borderRadius: '10px', overflow: 'hidden', marginBottom: '8px' }}>
+            <CampusMapPicker lat={lat} lng={lng} onChange={handleMapChange} />
+          </div>
+          <p style={{ color: T.textSubtle, fontSize: '11px', marginBottom: '8px' }}>
+            Haz clic en el mapa para colocar el marcador, o arrástralo. También puedes escribir las coordenadas.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label style={{ ...labelStyle, marginBottom: '4px' }}>Latitud</label>
+              <input type="number" step="any" value={latInput} onChange={e => handleLatInput(e.target.value)} placeholder="Ej: 4.628055" className="w-full py-2 px-3 rounded-xl outline-none" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ ...labelStyle, marginBottom: '4px' }}>Longitud</label>
+              <input type="number" step="any" value={lngInput} onChange={e => handleLngInput(e.target.value)} placeholder="Ej: -74.065277" className="w-full py-2 px-3 rounded-xl outline-none" style={inputStyle} />
+            </div>
+          </div>
+        </div>
         {error && <ErrorBanner message={error} T={T} />}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, color: T.btnGhostColor, cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
@@ -977,6 +1156,214 @@ function CampusForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof use
             {saving && <Loader2 size={14} className="animate-spin" />} {initial ? 'Guardar' : 'Crear'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════ */
+/*  CALENDAR SECTION                                                           */
+/* ════════════════════════════════════════════════════════════════════════════ */
+
+const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
+  INSCRIPCION:   'Inscripción',
+  INICIO_CLASES: 'Inicio de clases',
+  FIN_CLASES:    'Fin de clases',
+  PARCIAL:       'Parcial',
+  FESTIVO:       'Festivo',
+  PARO:          'Paro',
+  OTRO:          'Otro',
+};
+
+const CALENDAR_EVENT_TYPE_COLORS: Record<CalendarEventType, { bg: string; color: string; border: string }> = {
+  INSCRIPCION:   { bg: 'rgba(99,102,241,0.12)',  color: '#818CF8', border: 'rgba(99,102,241,0.22)' },
+  INICIO_CLASES: { bg: 'rgba(52,211,153,0.12)',  color: '#34D399', border: 'rgba(52,211,153,0.22)' },
+  FIN_CLASES:    { bg: 'rgba(244,114,182,0.12)', color: '#F472B6', border: 'rgba(244,114,182,0.22)' },
+  PARCIAL:       { bg: 'rgba(201,52,76,0.12)',   color: '#E8485F', border: 'rgba(201,52,76,0.22)' },
+  FESTIVO:       { bg: 'rgba(251,191,36,0.12)',  color: '#FBBF24', border: 'rgba(251,191,36,0.22)' },
+  PARO:          { bg: 'rgba(248,113,113,0.12)', color: '#F87171', border: 'rgba(248,113,113,0.22)' },
+  OTRO:          { bg: 'rgba(139,138,151,0.12)', color: '#8B8A97', border: 'rgba(139,138,151,0.22)' },
+};
+
+const ALL_CALENDAR_TYPES: CalendarEventType[] = [
+  'INSCRIPCION', 'INICIO_CLASES', 'FIN_CLASES', 'PARCIAL', 'FESTIVO', 'PARO', 'OTRO',
+];
+
+function CalendarSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
+  const [items, setItems] = useState<CalendarEventData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<CalendarEventData | null>(null);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    try { setItems(await calendarApi.list()); }
+    catch (e) { setError(e instanceof ApiError ? e.message : 'Error cargando eventos'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Eliminar este evento?')) return;
+    try { await calendarApi.delete(id); fetchItems(); }
+    catch (e) { setError(e instanceof ApiError ? e.message : 'Error eliminando'); }
+  };
+
+  const handleSave = async (data: CalendarEventPayload) => {
+    if (editing) await calendarApi.update(editing.id, data);
+    else await calendarApi.create(data);
+    setShowForm(false);
+    setEditing(null);
+    fetchItems();
+  };
+
+  const sortedItems = [...items].sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  return (
+    <div>
+      <SectionHeader
+        icon={Calendar}
+        title="Calendario académico"
+        subtitle="Gestiona los eventos del calendario institucional."
+        T={T}
+        action={{ label: 'Nuevo evento', onClick: () => { setEditing(null); setShowForm(true); } }}
+      />
+      {error && <ErrorBanner message={error} T={T} />}
+      {loading ? <LoadingIndicator T={T} /> : sortedItems.length === 0 ? (
+        <EmptyState label="No hay eventos registrados." T={T} />
+      ) : (
+        <div className="space-y-2">
+          {sortedItems.map(item => {
+            const accent = CALENDAR_EVENT_TYPE_COLORS[item.eventType] ?? CALENDAR_EVENT_TYPE_COLORS.OTRO;
+            const dateLabel = new Date(item.startDate + 'T00:00:00')
+              .toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+            return (
+              <div key={item.id} className="flex items-center gap-4 p-4 rounded-xl"
+                style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+                <div className="w-20 text-center px-2 py-1.5 rounded-lg flex-shrink-0"
+                  style={{ background: accent.bg, border: `1px solid ${accent.border}` }}>
+                  <span style={{ color: accent.color, fontSize: '11px', fontWeight: 700 }}>{dateLabel}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p style={{ color: T.text, fontSize: '14px', fontWeight: 500 }}>{item.title}</p>
+                  <span className="px-2 py-0.5 rounded-full mt-1 inline-block"
+                    style={{ background: accent.bg, color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>
+                    {CALENDAR_EVENT_TYPE_LABELS[item.eventType] ?? item.eventType}
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => { setEditing(item); setShowForm(true); }}
+                    className="p-2 rounded-lg" style={{ background: T.cardBg2, border: `1px solid ${T.cardBorder}`, color: T.textMuted, cursor: 'pointer' }}
+                    title="Editar"><ChevronRight size={14} /></button>
+                  <button onClick={() => handleDelete(item.id)}
+                    className="p-2 rounded-lg" style={{ background: T.error.bg, border: `1px solid ${T.error.border}`, color: T.error.text, cursor: 'pointer' }}
+                    title="Eliminar"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showForm && createPortal(
+        <CalendarEventForm
+          initial={editing}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          T={T}
+        />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+function CalendarEventForm({ initial, onSave, onClose, T }: {
+  initial: CalendarEventData | null;
+  onSave: (data: CalendarEventPayload) => Promise<void>;
+  onClose: () => void;
+  T: ReturnType<typeof useThemeTokens>;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [eventType, setEventType] = useState<CalendarEventType>(initial?.eventType ?? 'OTRO');
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '');
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const inputStyle = {
+    width: '100%', padding: '10px 12px', borderRadius: '10px',
+    background: T.inputBg, border: `1px solid ${T.inputBorder}`,
+    color: T.text, fontSize: '14px', outline: 'none',
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !startDate) { setError('Título y fecha de inicio son obligatorios'); return; }
+    setSaving(true);
+    try {
+      const payload: CalendarEventPayload = { title, eventType, startDate };
+      if (description) payload.description = description;
+      if (endDate) payload.endDate = endDate;
+      await onSave(payload);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al guardar');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+    }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: T.isDark ? 'rgba(30,30,52,0.97)' : 'rgba(255,255,255,0.97)',
+        border: `1px solid ${T.cardBorder}`, borderRadius: '20px', padding: '28px',
+        width: '100%', maxWidth: '480px', boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+        maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 style={{ color: T.text, fontWeight: 700, fontSize: '18px' }}>
+            {initial ? 'Editar evento' : 'Nuevo evento'}
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted }}>
+            <X size={20} />
+          </button>
+        </div>
+        {error && <ErrorBanner message={error} T={T} />}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <FormInput label="Título" value={title} onChange={setTitle} T={T} placeholder="Ej. Inicio inscripciones 2026-2" />
+          <FormSelect label="Tipo de evento" value={eventType} onChange={v => setEventType(v as CalendarEventType)}
+            options={ALL_CALENDAR_TYPES.map(t => ({ val: t, label: CALENDAR_EVENT_TYPE_LABELS[t] }))} T={T} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Fecha inicio</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required style={inputStyle} />
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Fecha fin (opcional)</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <FormTextarea label="Descripción (opcional)" value={description} onChange={setDescription} T={T} />
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              style={{ flex: 1, padding: '10px', borderRadius: '10px', background: T.cardBg2, border: `1px solid ${T.cardBorder}`, color: T.textMuted, fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving}
+              style={{ flex: 1, padding: '10px', borderRadius: '10px', background: '#C9344C', border: 'none', color: 'white', fontSize: '14px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando...' : initial ? 'Guardar cambios' : 'Crear evento'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

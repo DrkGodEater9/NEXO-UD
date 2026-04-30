@@ -18,6 +18,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isRestoring: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { nickname: string; email: string; password: string; studentCode: string }) => Promise<void>;
   logout: () => void;
@@ -54,6 +55,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
 
   // Restore session on mount
   useEffect(() => {
@@ -83,12 +85,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem('nexoud_token');
           localStorage.removeItem('nexoud_user');
           setUser(null);
+        }).finally(() => {
+          setIsRestoring(false);
         });
+        return;
       } catch {
         localStorage.removeItem('nexoud_token');
         localStorage.removeItem('nexoud_user');
       }
     }
+    setIsRestoring(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
@@ -152,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isRestoring, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
