@@ -5,6 +5,7 @@ import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
 import { Heart, Plus, Trash2, X, Loader2, AlertCircle } from 'lucide-react';
 import { welfareApi, WelfareData, WelfarePayload, ApiError } from '../services/api';
+import { PhotoPicker } from '../components/PhotoPicker';
 
 const categoryLabels: Record<string, string> = {
   APOYO_ALIMENTARIO: 'Apoyo Alimentario',
@@ -91,21 +92,25 @@ export default function ManageWelfarePage() {
           <div className="space-y-3">
             {items.map(item => {
               const accent = (categoryColors[item.category] || (() => T.accentIndigo))(T);
+              const parsedImages: string[] = (() => { try { return item.images ? JSON.parse(item.images) : []; } catch { return []; } })();
               return (
-                <div key={item.id} className="p-4 rounded-2xl" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
-                        <span className="px-2 py-0.5 rounded-full" style={{ background: accent.bg, border: `1px solid ${accent.border}`, color: accent.color, fontSize: '10px', fontWeight: 600 }}>{categoryLabels[item.category] || item.category}</span>
+                <div key={item.id} className="rounded-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+                  {parsedImages.length > 0 && <InlineMosaic photos={parsedImages} />}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
+                          <span className="px-2 py-0.5 rounded-full" style={{ background: accent.bg, border: `1px solid ${accent.border}`, color: accent.color, fontSize: '10px', fontWeight: 600 }}>{categoryLabels[item.category] || item.category}</span>
+                        </div>
+                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
+                        {item.links && <p style={{ color: T.link, fontSize: '12px', marginTop: '4px' }}>{item.links}</p>}
+                        <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                       </div>
-                      <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
-                      {item.links && <p style={{ color: T.link, fontSize: '12px', marginTop: '4px' }}>{item.links}</p>}
-                      <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
-                      <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
+                        <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -118,18 +123,58 @@ export default function ManageWelfarePage() {
   );
 }
 
+function InlineMosaic({ photos }: { photos: string[] }) {
+  if (photos.length === 1) {
+    return <div style={{ aspectRatio: '16/7' }}><img src={photos[0]} alt="" className="w-full h-full object-cover" /></div>;
+  }
+  if (photos.length === 2) {
+    return (
+      <div className="flex" style={{ aspectRatio: '16/7' }}>
+        {photos.map((src, i) => (
+          <div key={i} className="flex-1" style={{ borderRight: i === 0 ? '2px solid white' : undefined }}>
+            <img src={src} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex" style={{ aspectRatio: '16/7' }}>
+      <div style={{ flex: '0 0 60%', borderRight: '2px solid white' }}>
+        <img src={photos[0]} alt="" className="w-full h-full object-cover" />
+      </div>
+      <div className="flex flex-col flex-1">
+        {[1, 2].map(i => (
+          <div key={i} className="flex-1" style={{ borderTop: i === 2 ? '2px solid white' : undefined }}>
+            <img src={photos[i]} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof useThemeTokens>; initial: WelfareData | null; onSave: (d: WelfarePayload) => Promise<void>; onCancel: () => void }) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState<WelfarePayload['category']>(initial?.category as any ?? 'APOYO_ALIMENTARIO');
   const [links, setLinks] = useState(initial?.links ?? '');
+  const [photos, setPhotos] = useState<string[]>(() => {
+    try { return initial?.images ? JSON.parse(initial.images) : []; } catch { return []; }
+  });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) { setFormError('Título y descripción son obligatorios.'); return; }
     setSaving(true); setFormError(null);
-    try { await onSave({ title, description, category, links: links || undefined }); }
+    try {
+      await onSave({
+        title, description, category,
+        links: links || undefined,
+        images: photos.length > 0 ? JSON.stringify(photos) : undefined,
+      });
+    }
     catch (e: any) { setFormError(e.message || 'Error guardando'); setSaving(false); }
   };
 
@@ -158,6 +203,7 @@ function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof us
           <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Enlaces (opcional)</label>
           <input type="text" value={links} onChange={e => setLinks(e.target.value)} placeholder="URL de recurso" className="w-full py-2.5 px-3 rounded-xl outline-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
         </div>
+        <PhotoPicker photos={photos} onChange={setPhotos} />
         {formError && <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}><AlertCircle size={14} style={{ color: T.error.text }} /><p style={{ color: T.error.text, fontSize: '12px' }}>{formError}</p></div>}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, color: T.btnGhostColor, cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>

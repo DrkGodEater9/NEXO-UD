@@ -346,31 +346,34 @@ export default function InfoPage() {
                   const accent = welfareCategoryAccent[item.category] || T.accentIndigo;
                   const label = welfareCategoryLabel[item.category] || item.category;
                   return (
-                    <div key={item.id} className="p-5 rounded-2xl transition-all"
+                    <div key={item.id} className="rounded-2xl overflow-hidden transition-all"
                       style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
                       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = T.cardHoverShadow; }}
                       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = T.cardShadow; }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-6 rounded-full" style={{ background: accent.color }} />
-                          <span className="px-2 py-0.5 rounded-full"
-                            style={{ background: T.isDark ? `${accent.color}18` : accent.bg, color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>
-                            {label}
+                      {(() => { try { const imgs: string[] = item.images ? JSON.parse(item.images) : []; return imgs.length > 0 ? <InfoMosaic photos={imgs} /> : null; } catch { return null; } })()}
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-6 rounded-full" style={{ background: accent.color }} />
+                            <span className="px-2 py-0.5 rounded-full"
+                              style={{ background: T.isDark ? `${accent.color}18` : accent.bg, color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>
+                              {label}
+                            </span>
+                          </div>
+                          <span style={{ color: T.textSubtle, fontSize: '10px' }}>
+                            {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
-                        <span style={{ color: T.textSubtle, fontSize: '10px' }}>
-                          {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
+                        <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
+                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.description}</p>
+                        {item.links && (
+                          <a href={item.links} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 mt-3"
+                            style={{ color: T.link, fontSize: '12px', fontWeight: 500, textDecoration: 'none' }}>
+                            <ExternalLink size={11} /> Más información
+                          </a>
+                        )}
                       </div>
-                      <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
-                      <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.description}</p>
-                      {item.links && (
-                        <a href={item.links} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 mt-3"
-                          style={{ color: T.link, fontSize: '12px', fontWeight: 500, textDecoration: 'none' }}>
-                          <ExternalLink size={11} /> Más información
-                        </a>
-                      )}
                     </div>
                   );
                 })}
@@ -423,29 +426,32 @@ export default function InfoPage() {
                   const accent = item.type === 'ASAMBLEA' ? T.accentYellow : T.accentCyan;
                   const typeLabel = announcementTypeLabel[item.type] || item.type;
                   return (
-                    <div key={item.id} className="p-5 rounded-2xl transition-all"
+                    <div key={item.id} className="rounded-2xl overflow-hidden transition-all"
                       style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
                       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = T.cardHoverShadow; }}
                       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = T.cardShadow; }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full"
-                            style={{ background: T.isDark ? `${accent.color}18` : accent.bg, color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>
-                            {typeLabel}
-                          </span>
-                          {item.scope === 'FACULTAD' && item.faculty && (
+                      {(() => { try { const imgs: string[] = item.images ? JSON.parse(item.images) : []; return imgs.length > 0 ? <InfoMosaic photos={imgs} /> : null; } catch { return null; } })()}
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded-full"
-                              style={{ background: T.cardBg2, color: T.textMuted, fontSize: '10px', fontWeight: 500, border: `1px solid ${T.divider}` }}>
-                              {item.faculty}
+                              style={{ background: T.isDark ? `${accent.color}18` : accent.bg, color: accent.color, fontSize: '10px', fontWeight: 600, border: `1px solid ${accent.border}` }}>
+                              {typeLabel}
                             </span>
-                          )}
+                            {item.scope === 'FACULTAD' && item.faculty && (
+                              <span className="px-2 py-0.5 rounded-full"
+                                style={{ background: T.cardBg2, color: T.textMuted, fontSize: '10px', fontWeight: 500, border: `1px solid ${T.divider}` }}>
+                                {item.faculty}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ color: T.textSubtle, fontSize: '10px' }}>
+                            {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
                         </div>
-                        <span style={{ color: T.textSubtle, fontSize: '10px' }}>
-                          {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
+                        <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
+                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.body}</p>
                       </div>
-                      <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
-                      <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.body}</p>
                     </div>
                   );
                 })}
@@ -455,5 +461,36 @@ export default function InfoPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function InfoMosaic({ photos }: { photos: string[] }) {
+  if (photos.length === 1) {
+    return <div style={{ aspectRatio: '16/7' }}><img src={photos[0]} alt="" className="w-full h-full object-cover" /></div>;
+  }
+  if (photos.length === 2) {
+    return (
+      <div className="flex" style={{ aspectRatio: '16/7' }}>
+        {photos.map((src, i) => (
+          <div key={i} className="flex-1" style={{ borderRight: i === 0 ? '2px solid white' : undefined }}>
+            <img src={src} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex" style={{ aspectRatio: '16/7' }}>
+      <div style={{ flex: '0 0 60%', borderRight: '2px solid white' }}>
+        <img src={photos[0]} alt="" className="w-full h-full object-cover" />
+      </div>
+      <div className="flex flex-col flex-1">
+        {[1, 2].map(i => (
+          <div key={i} className="flex-1" style={{ borderTop: i === 2 ? '2px solid white' : undefined }}>
+            <img src={photos[i]} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

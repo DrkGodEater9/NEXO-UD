@@ -19,6 +19,7 @@ import {
   semesterApi, SemesterData,
   calendarApi, CalendarEventData, CalendarEventPayload, CalendarEventType,
 } from '../services/api';
+import { PhotoPicker } from '../components/PhotoPicker';
 
 type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus' | 'calendar';
 
@@ -698,26 +699,32 @@ function AnnouncementsSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
       )}
       {loading ? <LoadingIndicator T={T} /> : items.length === 0 ? <EmptyState label="No hay avisos registrados." T={T} /> : (
         <div className="space-y-3">
-          {items.map(item => (
-            <div key={item.id} className="p-4 rounded-2xl transition-all" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: T.accentIndigo.bg, border: `1px solid ${T.accentIndigo.border}`, color: T.accentIndigo.color, fontSize: '10px', fontWeight: 600 }}>{scopeLabel(item.scope)}</span>
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: item.type === 'ASAMBLEA' ? T.accentYellow.bg : T.accentCyan.bg, border: `1px solid ${item.type === 'ASAMBLEA' ? T.accentYellow.border : T.accentCyan.border}`, color: item.type === 'ASAMBLEA' ? T.accentYellow.color : T.accentCyan.color, fontSize: '10px', fontWeight: 600 }}>{typeLabel(item.type)}</span>
-                    {item.faculty && <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, border: `1px solid ${T.tagBorder}`, color: T.tagColor, fontSize: '10px', fontWeight: 600 }}>{item.faculty}</span>}
+          {items.map(item => {
+            const parsedImgs: string[] = (() => { try { return item.images ? JSON.parse(item.images) : []; } catch { return []; } })();
+            return (
+              <div key={item.id} className="rounded-2xl overflow-hidden transition-all" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+                {parsedImgs.length > 0 && <AdminMosaic photos={parsedImgs} />}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
+                        <span className="px-2 py-0.5 rounded-full" style={{ background: T.accentIndigo.bg, border: `1px solid ${T.accentIndigo.border}`, color: T.accentIndigo.color, fontSize: '10px', fontWeight: 600 }}>{scopeLabel(item.scope)}</span>
+                        <span className="px-2 py-0.5 rounded-full" style={{ background: item.type === 'ASAMBLEA' ? T.accentYellow.bg : T.accentCyan.bg, border: `1px solid ${item.type === 'ASAMBLEA' ? T.accentYellow.border : T.accentCyan.border}`, color: item.type === 'ASAMBLEA' ? T.accentYellow.color : T.accentCyan.color, fontSize: '10px', fontWeight: 600 }}>{typeLabel(item.type)}</span>
+                        {item.faculty && <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, border: `1px solid ${T.tagBorder}`, color: T.tagColor, fontSize: '10px', fontWeight: 600 }}>{item.faculty}</span>}
+                      </div>
+                      <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.body}</p>
+                      <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg transition-all" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg transition-all" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
+                    </div>
                   </div>
-                  <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.body}</p>
-                  <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg transition-all" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
-                  <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg transition-all" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </>
@@ -730,13 +737,22 @@ function AnnouncementForm({ T, initial, onSave, onCancel }: { T: ReturnType<type
   const [scope, setScope] = useState<'FACULTAD' | 'UNIVERSIDAD'>(initial?.scope as any ?? 'UNIVERSIDAD');
   const [type, setType] = useState<'GENERAL' | 'ASAMBLEA'>(initial?.type as any ?? 'GENERAL');
   const [faculty, setFaculty] = useState(initial?.faculty ?? '');
+  const [photos, setPhotos] = useState<string[]>(() => {
+    try { return initial?.images ? JSON.parse(initial.images) : []; } catch { return []; }
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!title.trim() || !body.trim()) { setError('Título y contenido son obligatorios.'); return; }
     setSaving(true); setError(null);
-    try { await onSave({ title, body, scope, type, faculty: scope === 'FACULTAD' ? faculty : undefined }); }
+    try {
+      await onSave({
+        title, body, scope, type,
+        faculty: scope === 'FACULTAD' ? faculty : undefined,
+        images: photos.length > 0 ? JSON.stringify(photos) : undefined,
+      });
+    }
     catch (e: any) { setError(e.message || 'Error guardando'); setSaving(false); }
   };
 
@@ -754,6 +770,7 @@ function AnnouncementForm({ T, initial, onSave, onCancel }: { T: ReturnType<type
           <FormSelect label="Tipo" value={type} options={[{ val: 'GENERAL', label: 'General' }, { val: 'ASAMBLEA', label: 'Asamblea' }]} onChange={v => setType(v as any)} T={T} />
         </div>
         {scope === 'FACULTAD' && <FormInput label="Facultad" value={faculty} onChange={setFaculty} T={T} placeholder="Ej: Ingeniería" />}
+        <PhotoPicker photos={photos} onChange={setPhotos} />
         {error && <ErrorBanner message={error} T={T} />}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, color: T.btnGhostColor, cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
@@ -823,21 +840,25 @@ function WelfareSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
         <div className="space-y-3">
           {items.map(item => {
             const accent = (welfareCategoryAccents[item.category] || (() => T.accentIndigo))(T);
+            const parsedImgs: string[] = (() => { try { return item.images ? JSON.parse(item.images) : []; } catch { return []; } })();
             return (
-              <div key={item.id} className="p-4 rounded-2xl" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
-                      <span className="px-2 py-0.5 rounded-full" style={{ background: accent.bg, border: `1px solid ${accent.border}`, color: accent.color, fontSize: '10px', fontWeight: 600 }}>{welfareCategoryLabels[item.category] || item.category}</span>
+              <div key={item.id} className="rounded-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+                {parsedImgs.length > 0 && <AdminMosaic photos={parsedImgs} />}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
+                        <span className="px-2 py-0.5 rounded-full" style={{ background: accent.bg, border: `1px solid ${accent.border}`, color: accent.color, fontSize: '10px', fontWeight: 600 }}>{welfareCategoryLabels[item.category] || item.category}</span>
+                      </div>
+                      <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
+                      {item.links && <p style={{ color: T.link, fontSize: '12px', marginTop: '4px' }}>{item.links}</p>}
+                      <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
-                    <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
-                    {item.links && <p style={{ color: T.link, fontSize: '12px', marginTop: '4px' }}>{item.links}</p>}
-                    <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
-                    <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text }}><Trash2 size={14} /></button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -854,13 +875,22 @@ function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof us
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState<WelfarePayload['category']>(initial?.category as any ?? 'APOYO_ALIMENTARIO');
   const [links, setLinks] = useState(initial?.links ?? '');
+  const [photos, setPhotos] = useState<string[]>(() => {
+    try { return initial?.images ? JSON.parse(initial.images) : []; } catch { return []; }
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim()) { setError('Título y descripción son obligatorios.'); return; }
     setSaving(true); setError(null);
-    try { await onSave({ title, description, category, links: links || undefined }); }
+    try {
+      await onSave({
+        title, description, category,
+        links: links || undefined,
+        images: photos.length > 0 ? JSON.stringify(photos) : undefined,
+      });
+    }
     catch (e: any) { setError(e.message || 'Error guardando'); setSaving(false); }
   };
 
@@ -875,6 +905,7 @@ function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof us
         <FormTextarea label="Descripción" value={description} onChange={setDescription} T={T} />
         <FormSelect label="Categoría" value={category} options={Object.entries(welfareCategoryLabels).map(([val, label]) => ({ val, label }))} onChange={v => setCategory(v as any)} T={T} />
         <FormInput label="Enlaces (opcional)" value={links} onChange={setLinks} T={T} placeholder="URL de recurso relacionado" />
+        <PhotoPicker photos={photos} onChange={setPhotos} />
         {error && <ErrorBanner message={error} T={T} />}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, color: T.btnGhostColor, cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
@@ -1462,4 +1493,35 @@ function FormSelect({ label, value, options, onChange, T }: { label: string; val
 
 function formatRoleName(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function AdminMosaic({ photos }: { photos: string[] }) {
+  if (photos.length === 1) {
+    return <div style={{ aspectRatio: '16/7' }}><img src={photos[0]} alt="" className="w-full h-full object-cover" /></div>;
+  }
+  if (photos.length === 2) {
+    return (
+      <div className="flex" style={{ aspectRatio: '16/7' }}>
+        {photos.map((src, i) => (
+          <div key={i} className="flex-1" style={{ borderRight: i === 0 ? '2px solid white' : undefined }}>
+            <img src={src} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="flex" style={{ aspectRatio: '16/7' }}>
+      <div style={{ flex: '0 0 60%', borderRight: '2px solid white' }}>
+        <img src={photos[0]} alt="" className="w-full h-full object-cover" />
+      </div>
+      <div className="flex flex-col flex-1">
+        {[1, 2].map(i => (
+          <div key={i} className="flex-1" style={{ borderTop: i === 2 ? '2px solid white' : undefined }}>
+            <img src={photos[i]} alt="" className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

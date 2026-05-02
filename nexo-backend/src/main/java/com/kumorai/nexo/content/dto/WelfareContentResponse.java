@@ -8,6 +8,7 @@ public record WelfareContentResponse(
         String description,
         String category,
         String links,
+        String images,
         Long createdBy,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

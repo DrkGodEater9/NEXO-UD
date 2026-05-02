@@ -11,5 +11,6 @@ public record AnnouncementRequest(
         @NotBlank @Size(max = 5000) String body,
         @NotNull AnnouncementScope scope,
         @NotNull AnnouncementType type,
-        String faculty
+        String faculty,
+        String images
 ) {}

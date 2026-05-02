@@ -43,6 +43,7 @@ public class WelfareServiceImpl implements WelfareService {
                 .description(request.description())
                 .category(request.category())
                 .links(request.links())
+                .images(request.images())
                 .createdBy(createdBy)
                 .build();
         return toResponse(welfareContentRepository.save(content));
@@ -56,6 +57,7 @@ public class WelfareServiceImpl implements WelfareService {
         content.setDescription(request.description());
         content.setCategory(request.category());
         content.setLinks(request.links());
+        content.setImages(request.images());
         return toResponse(welfareContentRepository.save(content));
     }
 
@@ -79,6 +81,7 @@ public class WelfareServiceImpl implements WelfareService {
                 c.getDescription(),
                 c.getCategory().name(),
                 c.getLinks(),
+                c.getImages(),
                 c.getCreatedBy(),
                 c.getCreatedAt(),
                 c.getUpdatedAt()

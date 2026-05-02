@@ -29,6 +29,9 @@ public class WelfareContent {
 
     private String links;
 
+    @Column(columnDefinition = "TEXT")
+    private String images;
+
     @Column(nullable = false)
     private Long createdBy;
 

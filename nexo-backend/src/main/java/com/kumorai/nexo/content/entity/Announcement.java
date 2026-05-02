@@ -33,6 +33,9 @@ public class Announcement {
 
     private String faculty;
 
+    @Column(columnDefinition = "TEXT")
+    private String images;
+
     @Column(nullable = false)
     private Long createdBy;
 

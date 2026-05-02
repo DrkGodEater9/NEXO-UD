@@ -9,5 +9,6 @@ public record WelfareContentRequest(
         @NotBlank @Size(max = 255) String title,
         @NotBlank @Size(max = 5000) String description,
         @NotNull WelfareCategory category,
-        String links
+        String links,
+        String images
 ) {}
