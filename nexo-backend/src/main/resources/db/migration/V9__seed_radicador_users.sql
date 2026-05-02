@@ -1,11 +1,24 @@
 -- ============================================================
 --  NEXO-UD  |  V9__seed_radicador_users.sql
---  Inserta 4 usuarios de prueba con roles de radicador.
---  Contraseña para todos: admin123
---  Hash BCrypt cost-10 de 'admin123' (mismo que el super admin)
+--  1. Actualiza chk_role_name para incluir RADICADOR_CALENDARIO
+--  2. Inserta 4 usuarios de prueba con roles de radicador
+--  Contrasena para todos: admin123
 -- ============================================================
 
--- ── 1. RADICADOR_AVISOS ──────────────────────────────────────
+-- Actualizar CHECK constraint para aceptar el nuevo rol
+ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS chk_role_name;
+
+ALTER TABLE user_roles ADD CONSTRAINT chk_role_name
+    CHECK (role_name IN (
+        'ADMINISTRADOR',
+        'ESTUDIANTE',
+        'RADICADOR_AVISOS',
+        'RADICADOR_BIENESTAR',
+        'RADICADOR_SEDES',
+        'RADICADOR_CALENDARIO'
+    ));
+
+-- 1. RADICADOR_AVISOS
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
 VALUES (
     'radicador.avisos@udistrital.edu.co',
@@ -21,19 +34,15 @@ INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.avisos@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE');
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'RADICADOR_AVISOS', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.avisos@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_AVISOS'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_AVISOS');
 
--- ── 2. RADICADOR_BIENESTAR ───────────────────────────────────
+-- 2. RADICADOR_BIENESTAR
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
 VALUES (
     'radicador.bienestar@udistrital.edu.co',
@@ -49,19 +58,15 @@ INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.bienestar@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE');
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'RADICADOR_BIENESTAR', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.bienestar@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_BIENESTAR'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_BIENESTAR');
 
--- ── 3. RADICADOR_SEDES ───────────────────────────────────────
+-- 3. RADICADOR_SEDES
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
 VALUES (
     'radicador.sedes@udistrital.edu.co',
@@ -77,19 +82,15 @@ INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.sedes@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE');
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'RADICADOR_SEDES', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.sedes@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_SEDES'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_SEDES');
 
--- ── 4. RADICADOR_CALENDARIO ──────────────────────────────────
+-- 4. RADICADOR_CALENDARIO
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
 VALUES (
     'radicador.calendario@udistrital.edu.co',
@@ -105,14 +106,10 @@ INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.calendario@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE');
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
 SELECT 'RADICADOR_CALENDARIO', CURRENT_TIMESTAMP, u.id
 FROM users u
 WHERE u.email = 'radicador.calendario@udistrital.edu.co'
-  AND NOT EXISTS (
-    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_CALENDARIO'
-  );
+  AND NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_CALENDARIO');
