@@ -18,12 +18,20 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.avisos@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.avisos@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
+  );
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'RADICADOR_AVISOS', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.avisos@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'RADICADOR_AVISOS', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.avisos@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_AVISOS'
+  );
 
 -- ── 2. RADICADOR_BIENESTAR ───────────────────────────────────
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
@@ -38,12 +46,20 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.bienestar@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.bienestar@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
+  );
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'RADICADOR_BIENESTAR', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.bienestar@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'RADICADOR_BIENESTAR', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.bienestar@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_BIENESTAR'
+  );
 
 -- ── 3. RADICADOR_SEDES ───────────────────────────────────────
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
@@ -58,12 +74,20 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.sedes@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.sedes@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
+  );
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'RADICADOR_SEDES', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.sedes@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'RADICADOR_SEDES', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.sedes@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_SEDES'
+  );
 
 -- ── 4. RADICADOR_CALENDARIO ──────────────────────────────────
 INSERT INTO users (email, nickname, password_hash, active, created_at, updated_at)
@@ -78,9 +102,17 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.calendario@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'ESTUDIANTE', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.calendario@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'ESTUDIANTE'
+  );
 
 INSERT INTO user_roles (role_name, assigned_at, user_id)
-SELECT 'RADICADOR_CALENDARIO', CURRENT_TIMESTAMP, id FROM users WHERE email = 'radicador.calendario@udistrital.edu.co'
-ON CONFLICT ON CONSTRAINT uk_user_role DO NOTHING;
+SELECT 'RADICADOR_CALENDARIO', CURRENT_TIMESTAMP, u.id
+FROM users u
+WHERE u.email = 'radicador.calendario@udistrital.edu.co'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role_name = 'RADICADOR_CALENDARIO'
+  );
