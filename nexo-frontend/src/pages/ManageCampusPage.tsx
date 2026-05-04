@@ -222,6 +222,33 @@ function MapPicker({ lat, lng, onChange }: {
   );
 }
 
+// ── Seed constants ─────────────────────────────────────────────────────────────
+
+const FACULTIES = [
+  'Ingeniería',
+  'Ciencias y Educación',
+  'Tecnológica',
+  'Medio Ambiente',
+  'Artes',
+  'Ciencias Matemáticas y Naturales',
+  'Ciencias de la Salud',
+  'General',
+] as const;
+
+// Datos pre-cargados del seed V7__seed_campus.sql
+const KNOWN_CAMPUSES: { name: string; faculty: string; address: string; lat: number; lng: number }[] = [
+  { name: 'Sede Ingeniería (Sabio Caldas)',         faculty: 'Ingeniería',                       address: 'Calle 40 Sur No. 8B-84',        lat: 4.628055,  lng: -74.065277 },
+  { name: 'Sede Macarena A (Ciencias y Educación)', faculty: 'Ciencias y Educación',             address: 'Carrera 3 No. 26A-40',          lat: 4.614416,  lng: -74.064415 },
+  { name: 'Sede Macarena B (Ciencias y Educación)', faculty: 'Ciencias y Educación',             address: 'Carrera 3 No. 26A-40',          lat: 4.614416,  lng: -74.064415 },
+  { name: 'Sede Tecnológica',                       faculty: 'Tecnológica',                      address: 'Cra. 7 No. 40B-53',             lat: 4.577880,  lng: -74.150420 },
+  { name: 'Sede Vivero (Medio Ambiente)',            faculty: 'Medio Ambiente',                   address: 'Carrera 5 Este No. 15-82',      lat: 4.596600,  lng: -74.065000 },
+  { name: 'Ciudadela Universitaria Bosa Porvenir',  faculty: 'Ingeniería',                       address: 'Diagonal 86J No. 77G-15',       lat: 4.629100,  lng: -74.185000 },
+  { name: 'Sede ASAB (Artes)',                      faculty: 'Artes',                            address: 'Plaza de La Macarena No. 5-41', lat: 4.604510,  lng: -74.075420 },
+  { name: 'Edificio Calle 34',                      faculty: 'Ciencias y Educación',             address: 'Calle 34 No. 6-31',             lat: 4.623100,  lng: -74.068200 },
+  { name: 'Edificio Crisanto Luque (Ciencias)',     faculty: 'Ciencias Matemáticas y Naturales', address: 'Carrera 4 No. 26B-54',          lat: 4.604440,  lng: -74.072700 },
+  { name: 'Aduanilla de Paiba (Biblioteca Central)',faculty: 'General',                          address: 'Av. Cra. 30 No. 45A-53',       lat: 4.619000,  lng: -74.095000 },
+];
+
 // ── Form ───────────────────────────────────────────────────────────────────────
 
 function CampusForm({ T, initial, onSave, onCancel }: {
@@ -239,9 +266,31 @@ function CampusForm({ T, initial, onSave, onCancel }: {
   const [lngInput, setLngInput] = useState(initial?.longitude?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [nameSuggestions, setNameSuggestions] = useState<typeof KNOWN_CAMPUSES>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const inputStyle = { background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' };
   const labelStyle = { color: T.textMuted, fontSize: '12px', fontWeight: 600 as const, marginBottom: '6px', display: 'block' as const };
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (val.trim().length < 2) { setNameSuggestions([]); setShowSuggestions(false); return; }
+    const lower = val.toLowerCase();
+    const matches = KNOWN_CAMPUSES.filter(c => c.name.toLowerCase().includes(lower));
+    setNameSuggestions(matches);
+    setShowSuggestions(matches.length > 0);
+  };
+
+  const applySuggestion = (c: typeof KNOWN_CAMPUSES[number]) => {
+    setName(c.name);
+    setFaculty(c.faculty);
+    setAddress(c.address);
+    setLat(c.lat);
+    setLng(c.lng);
+    setLatInput(c.lat.toString());
+    setLngInput(c.lng.toString());
+    setShowSuggestions(false);
+  };
 
   const handleMapChange = (newLat: number, newLng: number) => {
     setLat(newLat);
@@ -298,20 +347,69 @@ function CampusForm({ T, initial, onSave, onCancel }: {
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label style={labelStyle}>Nombre <span style={{ color: '#E8485F' }}>*</span></label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Sede Macarena A" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Facultad <span style={{ color: '#E8485F' }}>*</span></label>
-              <input type="text" value={faculty} onChange={e => setFaculty(e.target.value)} placeholder="Ej: Ingeniería" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
-            </div>
+          {/* Nombre con autocompletado del seed */}
+          <div style={{ position: 'relative' }}>
+            <label style={labelStyle}>Nombre <span style={{ color: '#E8485F' }}>*</span></label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => handleNameChange(e.target.value)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onFocus={() => name.trim().length >= 2 && nameSuggestions.length > 0 && setShowSuggestions(true)}
+              placeholder="Ej: Sede Macarena A"
+              className="w-full py-2.5 px-3 rounded-xl outline-none"
+              style={inputStyle}
+              autoComplete="off"
+            />
+            {showSuggestions && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                background: T.isDark ? 'rgba(22,22,42,0.98)' : T.cardBg,
+                border: `1px solid ${T.cardBorder}`,
+                borderRadius: '12px', marginTop: '4px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                overflow: 'hidden',
+              }}>
+                {nameSuggestions.map((c, i) => (
+                  <button
+                    key={i}
+                    onMouseDown={() => applySuggestion(c)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '8px 12px', background: 'none', border: 'none',
+                      cursor: 'pointer', borderBottom: i < nameSuggestions.length - 1 ? `1px solid ${T.cardBorder}` : 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.btnGhostBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <p style={{ color: T.text, fontSize: '12px', fontWeight: 600, margin: 0 }}>{c.name}</p>
+                    <p style={{ color: T.textMuted, fontSize: '11px', margin: 0 }}>{c.faculty} · {c.address}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <label style={labelStyle}>Dirección</label>
-            <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ej: Calle 40 Sur No. 8B-84" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Facultad como select con valores del seed */}
+            <div>
+              <label style={labelStyle}>Facultad <span style={{ color: '#E8485F' }}>*</span></label>
+              <select
+                value={faculty}
+                onChange={e => setFaculty(e.target.value)}
+                className="w-full py-2.5 px-3 rounded-xl outline-none"
+                style={{ ...inputStyle, appearance: 'none' as const, cursor: 'pointer' }}
+              >
+                <option value="" disabled>Selecciona una facultad</option>
+                {FACULTIES.map(f => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Dirección</label>
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ej: Calle 40 Sur No. 8B-84" className="w-full py-2.5 px-3 rounded-xl outline-none" style={inputStyle} />
+            </div>
           </div>
 
           <div>
