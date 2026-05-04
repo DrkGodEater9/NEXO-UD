@@ -8,7 +8,8 @@ import { useThemeTokens } from '../context/useThemeTokens';
 import {
   UploadCloud, FileJson, CheckCircle, AlertCircle, Loader2, Database,
   AlertTriangle, Users, Shield, Megaphone, Heart, MapPin, Search,
-  Plus, Trash2, X, ChevronLeft, ChevronRight, Settings, Calendar, Star
+  Plus, Trash2, X, ChevronLeft, ChevronRight, ChevronDown, Settings, Calendar, Star, Bug,
+  ImageOff, RotateCcw
 } from 'lucide-react';
 import {
   academicOfferApi, AcademicOfferUploadResponse, ApiError,
@@ -18,10 +19,11 @@ import {
   campusApi, CampusData, CampusPayload,
   semesterApi, SemesterData,
   calendarApi, CalendarEventData, CalendarEventPayload, CalendarEventType,
+  reportApi, ReportData, ReportStatus, ReportType,
 } from '../services/api';
 import { PhotoPicker } from '../components/PhotoPicker';
 
-type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus' | 'calendar';
+type Section = 'config' | 'upload' | 'roles' | 'announcements' | 'welfare' | 'campus' | 'calendar' | 'bugs';
 
 const sidebarSections: { key: Section; label: string; icon: typeof Database }[] = [
   { key: 'config', label: 'Configuración', icon: Settings },
@@ -31,6 +33,7 @@ const sidebarSections: { key: Section; label: string; icon: typeof Database }[] 
   { key: 'welfare', label: 'Bienestar', icon: Heart },
   { key: 'campus', label: 'Sedes', icon: MapPin },
   { key: 'calendar', label: 'Calendario', icon: Calendar },
+  { key: 'bugs', label: 'Reportes', icon: Bug },
 ];
 
 export default function AdminDashboardPage() {
@@ -117,6 +120,7 @@ export default function AdminDashboardPage() {
           {section === 'welfare' && <WelfareSection T={T} />}
           {section === 'campus' && <CampusSection T={T} />}
           {section === 'calendar' && <CalendarSection T={T} />}
+          {section === 'bugs' && <BugsSection T={T} />}
         </div>
       </div>
     </AppLayout>
@@ -1404,7 +1408,7 @@ function CalendarEventForm({ initial, onSave, onClose, T }: {
 /*  SHARED COMPONENTS                                                          */
 /* ════════════════════════════════════════════════════════════════════════════ */
 
-function SectionHeader({ icon: Icon, title, subtitle, T, action }: { icon: typeof Database; title: string; subtitle: string; T: ReturnType<typeof useThemeTokens>; action?: { label: string; onClick: () => void } }) {
+function SectionHeader({ icon: Icon, title, subtitle, T, action }: { icon: typeof Database; title: string; subtitle: string; T: ReturnType<typeof useThemeTokens>; action?: { label: string; onClick: () => void; actionIcon?: typeof Plus } }) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div className="flex items-center gap-3">
@@ -1422,7 +1426,7 @@ function SectionHeader({ icon: Icon, title, subtitle, T, action }: { icon: typeo
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl"
           style={{ background: '#C9344C', color: 'white', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
         >
-          <Plus size={14} /> {action.label}
+          {action.actionIcon ? <action.actionIcon size={14} /> : <Plus size={14} />} {action.label}
         </button>
       )}
     </div>
@@ -1493,6 +1497,226 @@ function FormSelect({ label, value, options, onChange, T }: { label: string; val
 
 function formatRoleName(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+/* ════════════════════════════════════════════════════════════════════════════ */
+/*  BUGS / REPORTS SECTION                                                      */
+/* ════════════════════════════════════════════════════════════════════════════ */
+
+const reportTypeLabels: Record<string, string> = {
+  ERROR_HORARIO: 'Error en horario',
+  CAMBIO_SALON: 'Cambio de salón',
+  INFORMACION_INCORRECTA: 'Información incorrecta',
+  OTRO: 'Otro',
+};
+
+const reportStatusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  PENDIENTE:     { label: 'Pendiente',    color: '#D97706', bg: 'rgba(217,119,6,0.1)',  border: 'rgba(217,119,6,0.25)' },
+  EN_REVISION:   { label: 'En revisión',  color: '#6366F1', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)' },
+  RESUELTO:      { label: 'Resuelto',     color: '#16A34A', bg: 'rgba(22,163,74,0.1)',  border: 'rgba(22,163,74,0.25)' },
+  DESCARTADO:    { label: 'Descartado',   color: '#6B7280', bg: 'rgba(107,114,128,0.1)',border: 'rgba(107,114,128,0.25)' },
+};
+
+function BugsSection({ T }: { T: ReturnType<typeof useThemeTokens> }) {
+  const [reports, setReports] = useState<ReportData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | ''>('');
+  const [typeFilter, setTypeFilter] = useState<ReportType | ''>('');
+  const [updating, setUpdating] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
+
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      setReports(await reportApi.listAll(
+        statusFilter as ReportStatus || undefined,
+        typeFilter as ReportType || undefined,
+      ));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Error cargando reportes');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, typeFilter]);
+
+  useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  const handleStatus = async (id: number, status: ReportStatus) => {
+    setUpdating(id);
+    try {
+      const updated = await reportApi.updateStatus(id, status);
+      setReports(prev => prev.map(r => r.id === id ? updated : r));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Error actualizando');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const pendingCount = reports.filter(r => r.status === 'PENDIENTE').length;
+
+  return (
+    <>
+      <SectionHeader
+        icon={Bug}
+        title="Reportes de problemas"
+        subtitle={`${reports.length} reporte${reports.length !== 1 ? 's' : ''} · ${pendingCount} pendiente${pendingCount !== 1 ? 's' : ''}`}
+        T={T}
+        action={{ label: 'Actualizar', onClick: fetchReports, actionIcon: RotateCcw }}
+      />
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {/* Status filter */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setStatusOpen(o => !o); setTypeOpen(false); }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: T.cardBg, border: `1px solid ${statusFilter ? '#C9344C' : T.cardBorder}`, color: statusFilter ? '#C9344C' : T.textMuted, fontSize: '12px', fontWeight: 500, cursor: 'pointer', minWidth: '148px', justifyContent: 'space-between' }}
+          >
+            <span>{statusFilter ? reportStatusConfig[statusFilter]?.label : 'Todos los estados'}</span>
+            <ChevronDown size={13} style={{ transition: 'transform 0.15s', transform: statusOpen ? 'rotate(180deg)' : 'none', flexShrink: 0 }} />
+          </button>
+          {statusOpen && (
+            <div className="absolute top-full left-0 mt-1 rounded-xl overflow-hidden z-20" style={{ background: T.isDark ? 'rgb(30,26,48)' : '#FFFFFF', border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, minWidth: '160px' }}>
+              {[{ val: '', label: 'Todos los estados' }, ...Object.entries(reportStatusConfig).map(([val, { label }]) => ({ val, label }))].map(({ val, label }) => (
+                <button key={val} type="button"
+                  onClick={() => { setStatusFilter(val as any); setStatusOpen(false); }}
+                  className="w-full text-left px-3 py-2.5 transition-all"
+                  style={{ background: val === statusFilter ? (T.isDark ? 'rgba(201,52,76,0.12)' : 'rgba(201,52,76,0.06)') : 'transparent', color: val === statusFilter ? '#C9344C' : T.text, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => { if (val !== statusFilter) e.currentTarget.style.background = T.isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F7'; }}
+                  onMouseLeave={e => { if (val !== statusFilter) e.currentTarget.style.background = 'transparent'; }}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Type filter */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setTypeOpen(o => !o); setStatusOpen(false); }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: T.cardBg, border: `1px solid ${typeFilter ? '#C9344C' : T.cardBorder}`, color: typeFilter ? '#C9344C' : T.textMuted, fontSize: '12px', fontWeight: 500, cursor: 'pointer', minWidth: '148px', justifyContent: 'space-between' }}
+          >
+            <span>{typeFilter ? reportTypeLabels[typeFilter] : 'Todos los tipos'}</span>
+            <ChevronDown size={13} style={{ transition: 'transform 0.15s', transform: typeOpen ? 'rotate(180deg)' : 'none', flexShrink: 0 }} />
+          </button>
+          {typeOpen && (
+            <div className="absolute top-full left-0 mt-1 rounded-xl overflow-hidden z-20" style={{ background: T.isDark ? 'rgb(30,26,48)' : '#FFFFFF', border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow, minWidth: '200px' }}>
+              {[{ val: '', label: 'Todos los tipos' }, ...Object.entries(reportTypeLabels).map(([val, label]) => ({ val, label }))].map(({ val, label }) => (
+                <button key={val} type="button"
+                  onClick={() => { setTypeFilter(val as any); setTypeOpen(false); }}
+                  className="w-full text-left px-3 py-2.5 transition-all"
+                  style={{ background: val === typeFilter ? (T.isDark ? 'rgba(201,52,76,0.12)' : 'rgba(201,52,76,0.06)') : 'transparent', color: val === typeFilter ? '#C9344C' : T.text, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => { if (val !== typeFilter) e.currentTarget.style.background = T.isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F7'; }}
+                  onMouseLeave={e => { if (val !== typeFilter) e.currentTarget.style.background = 'transparent'; }}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && <ErrorBanner message={error} T={T} />}
+
+      {loading ? <LoadingIndicator T={T} /> : reports.length === 0 ? (
+        <EmptyState label="No hay reportes con los filtros seleccionados." T={T} />
+      ) : (
+        <div className="space-y-3">
+          {reports.map(report => {
+            const sc = reportStatusConfig[report.status] || reportStatusConfig.OTRO;
+            const typeLabel = reportTypeLabels[report.reportType] || report.reportType;
+            const isExpanded = expandedId === report.id;
+            let images: string[] = [];
+            try { images = report.evidenceUrl ? JSON.parse(report.evidenceUrl) : []; } catch { /* not json */ }
+            const hasImages = images.length > 0;
+
+            return (
+              <div key={report.id} className="rounded-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
+                <div className="p-4">
+                  {/* Top row */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: T.isDark ? 'rgba(201,52,76,0.12)' : 'rgba(201,52,76,0.07)', border: '1px solid rgba(201,52,76,0.18)' }}>
+                      <Bug size={14} style={{ color: '#C9344C' }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="px-2 py-0.5 rounded-full" style={{ background: sc.bg, border: `1px solid ${sc.border}`, color: sc.color, fontSize: '10px', fontWeight: 600 }}>{sc.label}</span>
+                        <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, border: `1px solid ${T.tagBorder}`, color: T.tagColor, fontSize: '10px', fontWeight: 600 }}>{typeLabel}</span>
+                        <span style={{ color: T.textSubtle, fontSize: '10px' }}>#{report.id} · {new Date(report.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <p style={{ color: T.text, fontSize: '13px', lineHeight: 1.5 }} className={isExpanded ? '' : 'line-clamp-2'}>{report.description}</p>
+                      {report.description.length > 120 && (
+                        <button onClick={() => setExpandedId(isExpanded ? null : report.id)} style={{ color: T.link, fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', marginTop: '2px' }}>
+                          {isExpanded ? 'Ver menos' : 'Ver más'}
+                        </button>
+                      )}
+                      {report.resolvedAt && (
+                        <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '4px' }}>
+                          Resuelto: {new Date(report.resolvedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Images */}
+                  {hasImages && isExpanded && (
+                    <div className="mt-3 rounded-xl overflow-hidden" style={{ border: `1px solid ${T.cardBorder}` }}>
+                      <AdminMosaic photos={images} />
+                    </div>
+                  )}
+                  {hasImages && !isExpanded && (
+                    <button onClick={() => setExpandedId(report.id)} className="mt-2 flex items-center gap-1.5 text-left" style={{ color: T.textMuted, fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      <ImageOff size={12} />
+                      {images.length} imagen{images.length !== 1 ? 'es' : ''} adjunta{images.length !== 1 ? 's' : ''} — clic para ver
+                    </button>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                    {updating === report.id ? (
+                      <div className="flex items-center gap-1.5" style={{ color: T.textMuted, fontSize: '12px' }}>
+                        <Loader2 size={12} className="animate-spin" /> Actualizando...
+                      </div>
+                    ) : (
+                      <>
+                        {report.status !== 'EN_REVISION' && report.status !== 'RESUELTO' && report.status !== 'DESCARTADO' && (
+                          <button onClick={() => handleStatus(report.id, 'EN_REVISION')} className="px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#6366F1', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            Marcar en revisión
+                          </button>
+                        )}
+                        {report.status !== 'RESUELTO' && (
+                          <button onClick={() => handleStatus(report.id, 'RESUELTO')} className="px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.25)', color: '#16A34A', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            Marcar resuelto
+                          </button>
+                        )}
+                        {report.status !== 'DESCARTADO' && report.status !== 'RESUELTO' && (
+                          <button onClick={() => handleStatus(report.id, 'DESCARTADO')} className="px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(107,114,128,0.08)', border: '1px solid rgba(107,114,128,0.2)', color: '#6B7280', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            Descartar
+                          </button>
+                        )}
+                        {(report.status === 'RESUELTO' || report.status === 'DESCARTADO') && (
+                          <button onClick={() => handleStatus(report.id, 'PENDIENTE')} className="px-2.5 py-1.5 rounded-lg flex items-center gap-1" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, color: T.textMuted, fontSize: '11px', fontWeight: 500, cursor: 'pointer' }}>
+                            <RotateCcw size={10} /> Reabrir
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
 }
 
 function AdminMosaic({ photos }: { photos: string[] }) {

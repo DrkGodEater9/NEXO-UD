@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon, Shield
 } from 'lucide-react';
 import { ConfirmModal } from './Modal';
+import { BugReportButton } from './BugReportButton';
 
 const baseNavItems = [
   { path: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
@@ -396,6 +397,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           ))}
         </nav>
       </div>
+
+      <BugReportButton />
 
       <ConfirmModal
         isOpen={logoutConfirm}

@@ -27,6 +27,7 @@ public class Report {
     @Column(nullable = false, length = 2000)
     private String description;
 
+    @Column(columnDefinition = "TEXT")
     private String evidenceUrl;
 
     @Builder.Default

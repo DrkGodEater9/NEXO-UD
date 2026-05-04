@@ -404,6 +404,47 @@ export const welfareApi = {
   },
 };
 
+// ─── Bug Reports ─────────────────────────────────────────────────────────────
+
+export type ReportType = 'ERROR_HORARIO' | 'CAMBIO_SALON' | 'INFORMACION_INCORRECTA' | 'OTRO';
+export type ReportStatus = 'PENDIENTE' | 'EN_REVISION' | 'RESUELTO' | 'DESCARTADO';
+
+export interface ReportData {
+  id: number;
+  userId: number;
+  reportType: ReportType;
+  description: string;
+  evidenceUrl: string | null;
+  status: ReportStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export const reportApi = {
+  create(data: { reportType: ReportType; description: string; evidenceUrl?: string }) {
+    return request<ReportData>('/reports', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  myReports() {
+    return request<ReportData[]>('/reports/my');
+  },
+  listAll(status?: ReportStatus, reportType?: ReportType) {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (reportType) params.set('reportType', reportType);
+    const qs = params.toString();
+    return request<ReportData[]>(`/reports${qs ? '?' + qs : ''}`);
+  },
+  updateStatus(id: number, status: ReportStatus) {
+    return request<ReportData>(`/reports/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+};
+
 // ─── Campus ──────────────────────────────────────────────────────────────────
 
 export interface CampusData {
@@ -444,6 +485,32 @@ export const campusApi = {
   },
   delete(id: number) {
     return request<void>(`/campus/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ─── Campus Route (Google Directions proxy) ──────────────────────────────────
+
+export interface RouteStep {
+  instruction: string;
+  duration: string;
+  distance: string;
+  travelMode: string;
+  transitLine: string;
+}
+
+export interface RouteResponse {
+  encodedPolyline: string;
+  totalDuration: string;
+  totalDistance: string;
+  steps: RouteStep[];
+}
+
+export const routeApi = {
+  calculate(originLat: number, originLng: number, destLat: number, destLng: number) {
+    return request<RouteResponse>('/campus/route', {
+      method: 'POST',
+      body: JSON.stringify({ originLat, originLng, destLat, destLng }),
+    });
   },
 };
 

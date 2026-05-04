@@ -4,9 +4,13 @@ import com.kumorai.nexo.campus.dto.CampusRequest;
 import com.kumorai.nexo.campus.dto.CampusResponse;
 import com.kumorai.nexo.campus.dto.ClassroomRequest;
 import com.kumorai.nexo.campus.dto.ClassroomResponse;
+import com.kumorai.nexo.campus.dto.RouteRequest;
+import com.kumorai.nexo.campus.dto.RouteResponse;
 import com.kumorai.nexo.campus.service.CampusService;
 import com.kumorai.nexo.shared.exception.NexoException;
 import com.kumorai.nexo.user.service.UserService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,10 +22,17 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +46,77 @@ public class CampusController {
 
     @Value("${nexo.upload.dir}")
     private String uploadDir;
+
+    @Value("${nexo.google.maps.api-key}")
+    private String googleMapsApiKey;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    // ── Route Proxy (Google Directions API) ──────────────────────────────────
+
+    @PostMapping("/route")
+    public ResponseEntity<RouteResponse> getRoute(@Valid @RequestBody RouteRequest req) {
+        try {
+            String origin = req.originLat() + "," + req.originLng();
+            String dest   = req.destLat()   + "," + req.destLng();
+
+            String url = "https://maps.googleapis.com/maps/api/directions/json"
+                    + "?origin="      + URLEncoder.encode(origin, StandardCharsets.UTF_8)
+                    + "&destination=" + URLEncoder.encode(dest,   StandardCharsets.UTF_8)
+                    + "&mode=transit"
+                    + "&transit_mode=bus"
+                    + "&language=es"
+                    + "&region=co"
+                    + "&key=" + googleMapsApiKey;
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest httpReq = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> resp = client.send(httpReq, HttpResponse.BodyHandlers.ofString());
+            JsonNode root = MAPPER.readTree(resp.body());
+
+            String status = root.path("status").asText();
+            if (!"OK".equals(status)) {
+                throw NexoException.badRequest("No se encontró ruta: " + status);
+            }
+
+            JsonNode leg = root.path("routes").get(0).path("legs").get(0);
+            String encodedPolyline = root.path("routes").get(0)
+                    .path("overview_polyline").path("points").asText();
+
+            String totalDuration = leg.path("duration").path("text").asText();
+            String totalDistance = leg.path("distance").path("text").asText();
+
+            List<RouteResponse.RouteStep> steps = new ArrayList<>();
+            for (JsonNode step : leg.path("steps")) {
+                String mode        = step.path("travel_mode").asText();
+                String duration    = step.path("duration").path("text").asText();
+                String distance    = step.path("distance").path("text").asText();
+                String instruction = step.path("html_instructions").asText()
+                        .replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
+
+                String transitLine = "";
+                if ("TRANSIT".equals(mode)) {
+                    JsonNode line = step.path("transit_details").path("line");
+                    String shortName = line.path("short_name").asText("");
+                    String longName  = line.path("name").asText("");
+                    transitLine = shortName.isEmpty() ? longName : shortName;
+                }
+
+                steps.add(new RouteResponse.RouteStep(instruction, duration, distance, mode, transitLine));
+            }
+
+            return ResponseEntity.ok(new RouteResponse(encodedPolyline, totalDuration, totalDistance, steps));
+
+        } catch (NexoException e) {
+            throw e;
+        } catch (Exception e) {
+            throw NexoException.badRequest("Error consultando la ruta: " + e.getMessage());
+        }
+    }
 
     // ── Campus ────────────────────────────────────────────────────────────────
 
