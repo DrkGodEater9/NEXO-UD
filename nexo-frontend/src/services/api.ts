@@ -558,3 +558,4 @@ export const calendarApi = {
     return request<void>(`/calendar/${id}`, { method: 'DELETE' });
   },
 };
+
