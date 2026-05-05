@@ -634,6 +634,13 @@ html {
   --sidebar: #FFFFFF;
   --sidebar-foreground: #1D1D1F;
   --sidebar-border: #D2D2D7;
+
+  /* Legacy variables used by Planner / ScheduleViewer / RoutePanel */
+  --text-light:   #1D1D1F;
+  --text-muted:   #6E6E73;
+  --border-color: #D2D2D7;
+  --accent-cyan:  #4F46E5;
+  --accent-yellow: #C9344C;
 }
 
 [data-theme="light"] body {

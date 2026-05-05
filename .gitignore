@@ -16,6 +16,9 @@ nexo-backend/target/
 *.jar
 *.war
 
+# Claude Code
+.claude/
+
 # IDE
 .vscode/
 .idea/

@@ -16,8 +16,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       const stored = (localStorage.getItem('nexoud-theme') as Theme) || 'dark';
-      // Apply synchronously so the first paint already has the right data-theme
+      // Apply synchronously so the first paint already has the right data-theme and .dark class
       document.documentElement.setAttribute('data-theme', stored);
+      document.documentElement.classList.toggle('dark', stored === 'dark');
       return stored;
     } catch {
       return 'dark';
@@ -26,6 +27,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('nexoud-theme', theme);
   }, [theme]);
 
