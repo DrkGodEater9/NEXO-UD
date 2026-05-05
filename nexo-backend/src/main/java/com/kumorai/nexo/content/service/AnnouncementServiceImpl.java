@@ -41,6 +41,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
                 .scope(request.scope())
                 .type(request.type())
                 .faculty(request.faculty())
+                .links(request.links())
                 .images(request.images())
                 .createdBy(createdBy)
                 .build();
@@ -56,6 +57,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         announcement.setScope(request.scope());
         announcement.setType(request.type());
         announcement.setFaculty(request.faculty());
+        announcement.setLinks(request.links());
         announcement.setImages(request.images());
         return toResponse(announcementRepository.save(announcement));
     }
@@ -81,6 +83,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
                 a.getScope().name(),
                 a.getType().name(),
                 a.getFaculty(),
+                a.getLinks(),
                 a.getImages(),
                 a.getCreatedBy(),
                 a.getCreatedAt(),

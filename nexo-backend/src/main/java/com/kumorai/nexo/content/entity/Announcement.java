@@ -34,6 +34,9 @@ public class Announcement {
     private String faculty;
 
     @Column(columnDefinition = "TEXT")
+    private String links;
+
+    @Column(columnDefinition = "TEXT")
     private String images;
 
     @Column(nullable = false)

@@ -12,6 +12,7 @@ const categoryLabels: Record<string, string> = {
   BECAS: 'Becas',
   SALUD_MENTAL: 'Salud Mental',
   SERVICIOS_SALUD: 'Servicios de Salud',
+  OTRO: 'Otro',
 };
 
 const categoryColors: Record<string, (T: any) => any> = {
@@ -19,7 +20,18 @@ const categoryColors: Record<string, (T: any) => any> = {
   BECAS: T => T.accentGreen,
   SALUD_MENTAL: T => T.accentPink,
   SERVICIOS_SALUD: T => T.accentCyan,
+  OTRO: T => T.accentIndigo,
 };
+
+function parseLinks(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [raw];
+  } catch {
+    return [raw];
+  }
+}
 
 export default function ManageWelfarePage() {
   const navigate = useNavigate();
@@ -93,6 +105,7 @@ export default function ManageWelfarePage() {
             {items.map(item => {
               const accent = (categoryColors[item.category] || (() => T.accentIndigo))(T);
               const parsedImages: string[] = (() => { try { return item.images ? JSON.parse(item.images) : []; } catch { return []; } })();
+              const parsedLinks = parseLinks(item.links);
               return (
                 <div key={item.id} className="rounded-2xl overflow-hidden" style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}` }}>
                   {parsedImages.length > 0 && <InlineMosaic photos={parsedImages} />}
@@ -100,12 +113,20 @@ export default function ManageWelfarePage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                          <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600 }}>{item.title}</h3>
                           <span className="px-2 py-0.5 rounded-full" style={{ background: accent.bg, border: `1px solid ${accent.border}`, color: accent.color, fontSize: '10px', fontWeight: 600 }}>{categoryLabels[item.category] || item.category}</span>
+                          <p style={{ color: T.textSubtle, fontSize: '11px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                         </div>
-                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.description}</p>
-                        {item.links && <p style={{ color: T.link, fontSize: '12px', marginTop: '4px' }}>{item.links}</p>}
-                        <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        <h3 style={{ color: T.text, fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>{item.title}</h3>
+                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">
+                          {item.shortDescription || item.description}
+                        </p>
+                        {parsedLinks.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {parsedLinks.map((url, i) => (
+                              <span key={i} style={{ color: T.link, fontSize: '11px' }} className="truncate max-w-xs">{url}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => { setEditing(item); setShowForm(true); }} className="p-2 rounded-lg" style={{ background: T.btnGhostBg, border: `1px solid ${T.btnGhostBorder}`, cursor: 'pointer', color: T.textMuted, fontSize: '11px' }}>Editar</button>
@@ -156,22 +177,37 @@ function InlineMosaic({ photos }: { photos: string[] }) {
 
 function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof useThemeTokens>; initial: WelfareData | null; onSave: (d: WelfarePayload) => Promise<void>; onCancel: () => void }) {
   const [title, setTitle] = useState(initial?.title ?? '');
+  const [shortDescription, setShortDescription] = useState(initial?.shortDescription ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState<WelfarePayload['category']>(initial?.category as any ?? 'APOYO_ALIMENTARIO');
-  const [links, setLinks] = useState(initial?.links ?? '');
+  const [links, setLinks] = useState<string[]>(() => {
+    if (!initial?.links) return [''];
+    try {
+      const parsed = JSON.parse(initial.links);
+      return Array.isArray(parsed) ? (parsed.length > 0 ? parsed : ['']) : [initial.links];
+    } catch { return [initial.links]; }
+  });
   const [photos, setPhotos] = useState<string[]>(() => {
     try { return initial?.images ? JSON.parse(initial.images) : []; } catch { return []; }
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const addLink = () => setLinks(prev => [...prev, '']);
+  const removeLink = (i: number) => setLinks(prev => prev.filter((_, idx) => idx !== i));
+  const updateLink = (i: number, val: string) => setLinks(prev => prev.map((l, idx) => idx === i ? val : l));
+
   const handleSubmit = async () => {
-    if (!title.trim() || !description.trim()) { setFormError('Título y descripción son obligatorios.'); return; }
+    if (!title.trim() || !description.trim()) { setFormError('Título y descripción larga son obligatorios.'); return; }
     setSaving(true); setFormError(null);
+    const validLinks = links.filter(l => l.trim());
     try {
       await onSave({
-        title, description, category,
-        links: links || undefined,
+        title,
+        shortDescription: shortDescription.trim() || undefined,
+        description,
+        category,
+        links: validLinks.length > 0 ? JSON.stringify(validLinks) : undefined,
         images: photos.length > 0 ? JSON.stringify(photos) : undefined,
       });
     }
@@ -190,8 +226,13 @@ function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof us
           <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full py-2.5 px-3 rounded-xl outline-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
         </div>
         <div>
-          <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Descripción</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} className="w-full py-2.5 px-3 rounded-xl outline-none resize-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
+          <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Descripción corta <span style={{ color: T.textSubtle, fontWeight: 400 }}>(se muestra en la tarjeta)</span></label>
+          <textarea value={shortDescription} onChange={e => setShortDescription(e.target.value)} rows={2} maxLength={500} className="w-full py-2.5 px-3 rounded-xl outline-none resize-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
+          <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '3px', textAlign: 'right' }}>{shortDescription.length}/500</p>
+        </div>
+        <div>
+          <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Descripción larga <span style={{ color: T.textSubtle, fontWeight: 400 }}>(detalle completo)</span></label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={5} className="w-full py-2.5 px-3 rounded-xl outline-none resize-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
         </div>
         <div>
           <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Categoría</label>
@@ -200,8 +241,31 @@ function WelfareForm({ T, initial, onSave, onCancel }: { T: ReturnType<typeof us
           </select>
         </div>
         <div>
-          <label className="block mb-1.5" style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Enlaces (opcional)</label>
-          <input type="text" value={links} onChange={e => setLinks(e.target.value)} placeholder="URL de recurso" className="w-full py-2.5 px-3 rounded-xl outline-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
+          <div className="flex items-center justify-between mb-1.5">
+            <label style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Enlaces <span style={{ color: T.textSubtle, fontWeight: 400 }}>(opcional)</span></label>
+            <button type="button" onClick={addLink} className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: T.primaryBg, border: `1px solid ${T.primaryBorder}`, color: T.primary, cursor: 'pointer', fontSize: '11px', fontWeight: 500 }}>
+              <Plus size={11} /> Agregar URL
+            </button>
+          </div>
+          <div className="space-y-2">
+            {links.map((url, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={url}
+                  onChange={e => updateLink(i, e.target.value)}
+                  placeholder={`URL ${i + 1}`}
+                  className="flex-1 py-2.5 px-3 rounded-xl outline-none"
+                  style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }}
+                />
+                {links.length > 1 && (
+                  <button type="button" onClick={() => removeLink(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text, flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         <PhotoPicker photos={photos} onChange={setPhotos} />
         {formError && <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}><AlertCircle size={14} style={{ color: T.error.text }} /><p style={{ color: T.error.text, fontSize: '12px' }}>{formError}</p></div>}

@@ -5,7 +5,7 @@ import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
 import {
   MapPin, Calendar, Heart, BookOpen, Megaphone, ChevronRight,
-  Clock, ArrowLeft, Loader2, ExternalLink
+  Clock, ArrowLeft, Loader2, ExternalLink, X
 } from 'lucide-react';
 
 import {
@@ -128,11 +128,14 @@ export default function InfoPage() {
     notices:  T.accentPink,
   };
 
+  const [welfareModal, setWelfareModal] = useState<WelfareData | null>(null);
+
   const welfareCategoryLabel: Record<string, string> = {
     APOYO_ALIMENTARIO: 'Apoyo alimentario',
     BECAS: 'Becas',
     SALUD_MENTAL: 'Salud mental',
     SERVICIOS_SALUD: 'Servicios de salud',
+    OTRO: 'Otro',
   };
 
   const welfareCategoryAccent: Record<string, { color: string; bg: string; border: string }> = {
@@ -140,6 +143,7 @@ export default function InfoPage() {
     BECAS: T.accentGreen,
     SALUD_MENTAL: T.accentPink,
     SERVICIOS_SALUD: T.accentCyan,
+    OTRO: T.accentIndigo,
   };
 
   const announcementTypeLabel: Record<string, string> = {
@@ -345,6 +349,7 @@ export default function InfoPage() {
                 {welfareList.map(item => {
                   const accent = welfareCategoryAccent[item.category] || T.accentIndigo;
                   const label = welfareCategoryLabel[item.category] || item.category;
+                  const preview = item.shortDescription || item.description;
                   return (
                     <div key={item.id} className="rounded-2xl overflow-hidden transition-all"
                       style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}
@@ -365,14 +370,13 @@ export default function InfoPage() {
                           </span>
                         </div>
                         <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
-                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.description}</p>
-                        {item.links && (
-                          <a href={item.links} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1 mt-3"
-                            style={{ color: T.link, fontSize: '12px', fontWeight: 500, textDecoration: 'none' }}>
-                            <ExternalLink size={11} /> Más información
-                          </a>
-                        )}
+                        <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }} className="line-clamp-3">{preview}</p>
+                        <button
+                          onClick={() => setWelfareModal(item)}
+                          className="flex items-center gap-1 mt-3 cursor-pointer"
+                          style={{ background: 'none', border: 'none', padding: 0, color: T.accentGreen.color, fontSize: '12px', fontWeight: 600 }}>
+                          Ver <ChevronRight size={12} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -381,6 +385,146 @@ export default function InfoPage() {
             )}
           </div>
         )}
+
+        {/* ══════════════ Welfare detail modal ══════════════ */}
+        {welfareModal && (() => {
+          const accent = welfareCategoryAccent[welfareModal.category] || T.accentIndigo;
+          const label = welfareCategoryLabel[welfareModal.category] || welfareModal.category;
+          let imgs: string[] = [];
+          try { imgs = welfareModal.images ? JSON.parse(welfareModal.images) : []; } catch { imgs = []; }
+          let urls: string[] = [];
+          try {
+            if (welfareModal.links) {
+              const parsed = JSON.parse(welfareModal.links);
+              urls = Array.isArray(parsed) ? parsed.filter(Boolean) : [welfareModal.links];
+            }
+          } catch { if (welfareModal.links) urls = [welfareModal.links]; }
+
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+              style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setWelfareModal(null)}>
+              <div
+                className="w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+                style={{
+                  background: T.isDark ? 'rgba(18,14,35,0.97)' : '#FFFFFF',
+                  border: `1px solid ${T.isDark ? 'rgba(255,255,255,0.10)' : '#E5E5EA'}`,
+                  boxShadow: T.isDark ? '0 32px 80px rgba(0,0,0,0.7)' : '0 24px 64px rgba(0,0,0,0.18)',
+                  maxHeight: '92vh',
+                }}
+                onClick={e => e.stopPropagation()}>
+
+                {/* ── Hero image or color band ── */}
+                {imgs.length > 0 ? (
+                  <div className="relative flex-shrink-0" style={{ height: '220px' }}>
+                    <img src={imgs[0]} alt="" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)' }} />
+                    {/* Close button over image */}
+                    <button
+                      onClick={() => setWelfareModal(null)}
+                      className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-full"
+                      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', color: '#fff' }}>
+                      <X size={15} />
+                    </button>
+                    {/* Category badge over image */}
+                    <div className="absolute bottom-4 left-5 flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full"
+                        style={{ background: `${accent.color}28`, backdropFilter: 'blur(8px)', color: accent.color, fontSize: '11px', fontWeight: 700, border: `1px solid ${accent.color}50`, letterSpacing: '0.02em' }}>
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  /* No image — colored accent band */
+                  <div className="relative flex-shrink-0 flex items-end px-6 pb-5" style={{ height: '100px', background: `linear-gradient(135deg, ${accent.color}22 0%, ${accent.color}08 100%)`, borderBottom: `1px solid ${accent.color}20` }}>
+                    <button
+                      onClick={() => setWelfareModal(null)}
+                      className="absolute top-3 right-4 flex items-center justify-center w-8 h-8 rounded-full"
+                      style={{ background: T.cardBg2, border: `1px solid ${T.cardBorder}`, cursor: 'pointer', color: T.textMuted }}>
+                      <X size={15} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${accent.color}22`, border: `1px solid ${accent.color}33` }}>
+                        <Heart size={15} style={{ color: accent.color }} />
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full"
+                        style={{ background: `${accent.color}18`, color: accent.color, fontSize: '11px', fontWeight: 700, border: `1px solid ${accent.color}30` }}>
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Scrollable body ── */}
+                <div className="overflow-y-auto flex-1 p-6" style={{ overscrollBehavior: 'contain' }}>
+                  {/* Date */}
+                  <p style={{ color: T.textSubtle, fontSize: '11px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    {new Date(welfareModal.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+
+                  {/* Title */}
+                  <h2 style={{ color: T.text, fontWeight: 800, fontSize: '22px', lineHeight: 1.25, letterSpacing: '-0.02em', marginBottom: '16px' }}>
+                    {welfareModal.title}
+                  </h2>
+
+                  {/* Divider */}
+                  <div style={{ height: '1px', background: T.isDark ? 'rgba(255,255,255,0.07)' : '#F0F0F5', marginBottom: '16px' }} />
+
+                  {/* Description */}
+                  <p style={{ color: T.textMuted, fontSize: '14px', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                    {welfareModal.description}
+                  </p>
+
+                  {/* Links section */}
+                  {urls.length > 0 && (
+                    <div className="mt-6">
+                      <p style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                        Recursos
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {urls.map((url, i) => (
+                          <a key={i} href={toAbsoluteUrl(url)} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-3 rounded-xl transition-all"
+                            style={{ background: T.isDark ? 'rgba(255,255,255,0.04)' : '#F5F5F7', border: `1px solid ${T.isDark ? 'rgba(255,255,255,0.07)' : '#E5E5EA'}`, textDecoration: 'none' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = T.isDark ? 'rgba(255,255,255,0.07)' : '#EBEBF0'; e.currentTarget.style.borderColor = accent.border; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = T.isDark ? 'rgba(255,255,255,0.04)' : '#F5F5F7'; e.currentTarget.style.borderColor = T.isDark ? 'rgba(255,255,255,0.07)' : '#E5E5EA'; }}>
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: `${accent.color}18`, border: `1px solid ${accent.color}25` }}>
+                              <ExternalLink size={12} style={{ color: accent.color }} />
+                            </div>
+                            <span style={{ color: T.text, fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                              {url}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extra images thumbnails (2nd and 3rd) */}
+                  {imgs.length > 1 && (
+                    <div className="mt-6">
+                      <p style={{ color: T.textSubtle, fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                        Imágenes
+                      </p>
+                      <div className="flex gap-2">
+                        {imgs.slice(1).map((src, i) => (
+                          <div key={i} className="flex-1 rounded-xl overflow-hidden" style={{ aspectRatio: '4/3', maxWidth: '160px' }}>
+                            <img src={src} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="h-2" />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* SGA section */}
         {activeSection === 'sga' && (
@@ -451,6 +595,27 @@ export default function InfoPage() {
                         </div>
                         <h3 style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>{item.title}</h3>
                         <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{item.body}</p>
+                        {(() => {
+                          let urls: string[] = [];
+                          try {
+                            if (item.links) {
+                              const parsed = JSON.parse(item.links);
+                              urls = Array.isArray(parsed) ? parsed.filter(Boolean) : [item.links];
+                            }
+                          } catch { if (item.links) urls = [item.links]; }
+                          if (urls.length === 0) return null;
+                          return (
+                            <div className="mt-3 flex flex-col gap-1.5">
+                              {urls.map((url, i) => (
+                                <a key={i} href={toAbsoluteUrl(url)} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5"
+                                  style={{ color: T.link, fontSize: '12px', fontWeight: 500, textDecoration: 'none' }}>
+                                  <ExternalLink size={11} style={{ flexShrink: 0 }} /><span className="truncate">{url}</span>
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -462,6 +627,10 @@ export default function InfoPage() {
       </div>
     </AppLayout>
   );
+}
+
+function toAbsoluteUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
 function InfoMosaic({ photos }: { photos: string[] }) {

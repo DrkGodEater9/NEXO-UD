@@ -9,6 +9,7 @@ public record AnnouncementResponse(
         String scope,
         String type,
         String faculty,
+        String links,
         String images,
         Long createdBy,
         LocalDateTime createdAt,

@@ -20,6 +20,9 @@ public class WelfareContent {
     @Column(nullable = false)
     private String title;
 
+    @Column(length = 500)
+    private String shortDescription;
+
     @Column(nullable = false, length = 5000)
     private String description;
 

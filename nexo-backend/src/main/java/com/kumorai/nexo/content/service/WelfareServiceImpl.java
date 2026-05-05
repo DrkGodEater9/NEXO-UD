@@ -40,6 +40,7 @@ public class WelfareServiceImpl implements WelfareService {
     public WelfareContentResponse create(WelfareContentRequest request, Long createdBy) {
         WelfareContent content = WelfareContent.builder()
                 .title(request.title())
+                .shortDescription(request.shortDescription())
                 .description(request.description())
                 .category(request.category())
                 .links(request.links())
@@ -54,6 +55,7 @@ public class WelfareServiceImpl implements WelfareService {
     public WelfareContentResponse update(Long id, WelfareContentRequest request) {
         WelfareContent content = find(id);
         content.setTitle(request.title());
+        content.setShortDescription(request.shortDescription());
         content.setDescription(request.description());
         content.setCategory(request.category());
         content.setLinks(request.links());
@@ -78,6 +80,7 @@ public class WelfareServiceImpl implements WelfareService {
         return new WelfareContentResponse(
                 c.getId(),
                 c.getTitle(),
+                c.getShortDescription(),
                 c.getDescription(),
                 c.getCategory().name(),
                 c.getLinks(),

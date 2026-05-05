@@ -317,6 +317,7 @@ export interface AnnouncementData {
   scope: string;
   type: string;
   faculty: string | null;
+  links: string | null;
   images: string | null;
   createdBy: number;
   createdAt: string;
@@ -329,6 +330,7 @@ export interface AnnouncementPayload {
   scope: 'FACULTAD' | 'UNIVERSIDAD';
   type: 'GENERAL' | 'ASAMBLEA';
   faculty?: string;
+  links?: string;
   images?: string;
 }
 
@@ -365,6 +367,7 @@ export const announcementsApi = {
 export interface WelfareData {
   id: number;
   title: string;
+  shortDescription: string | null;
   description: string;
   category: string;
   links: string | null;
@@ -376,8 +379,9 @@ export interface WelfareData {
 
 export interface WelfarePayload {
   title: string;
+  shortDescription?: string;
   description: string;
-  category: 'APOYO_ALIMENTARIO' | 'BECAS' | 'SALUD_MENTAL' | 'SERVICIOS_SALUD';
+  category: 'APOYO_ALIMENTARIO' | 'BECAS' | 'SALUD_MENTAL' | 'SERVICIOS_SALUD' | 'OTRO';
   links?: string;
   images?: string;
 }

@@ -4,5 +4,6 @@ public enum WelfareCategory {
     APOYO_ALIMENTARIO,
     BECAS,
     SALUD_MENTAL,
-    SERVICIOS_SALUD
+    SERVICIOS_SALUD,
+    OTRO
 }

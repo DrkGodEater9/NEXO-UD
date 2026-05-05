@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import { useThemeTokens } from '../context/useThemeTokens';
-import { Megaphone, Plus, Trash2, X, Loader2, AlertCircle } from 'lucide-react';
+import { Megaphone, Plus, Trash2, X, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { announcementsApi, AnnouncementData, AnnouncementPayload, ApiError } from '../services/api';
 import { PhotoPicker } from '../components/PhotoPicker';
+
+function parseLinks(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [raw];
+  } catch { return [raw]; }
+}
 
 export default function ManageAnnouncementsPage() {
   const navigate = useNavigate();
@@ -101,6 +109,11 @@ export default function ManageAnnouncementsPage() {
                           {item.faculty && <span className="px-2 py-0.5 rounded-full" style={{ background: T.tagBg, border: `1px solid ${T.tagBorder}`, color: T.tagColor, fontSize: '10px', fontWeight: 600 }}>{item.faculty}</span>}
                         </div>
                         <p style={{ color: T.textMuted, fontSize: '13px', lineHeight: 1.5 }} className="line-clamp-2">{item.body}</p>
+                        {parseLinks(item.links).map((url, i) => (
+                          <span key={i} className="flex items-center gap-1 mt-1" style={{ color: T.link, fontSize: '11px' }}>
+                            <ExternalLink size={10} style={{ flexShrink: 0 }} /><span className="truncate">{url}</span>
+                          </span>
+                        ))}
                         <p style={{ color: T.textSubtle, fontSize: '11px', marginTop: '6px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -156,19 +169,32 @@ function AnnouncementForm({ T, initial, onSave, onCancel }: { T: ReturnType<type
   const [scope, setScope] = useState<'FACULTAD' | 'UNIVERSIDAD'>(initial?.scope as any ?? 'UNIVERSIDAD');
   const [type, setType] = useState<'GENERAL' | 'ASAMBLEA'>(initial?.type as any ?? 'GENERAL');
   const [faculty, setFaculty] = useState(initial?.faculty ?? '');
+  const [links, setLinks] = useState<string[]>(() => {
+    if (!initial?.links) return [''];
+    try {
+      const parsed = JSON.parse(initial.links);
+      return Array.isArray(parsed) ? (parsed.length > 0 ? parsed : ['']) : [initial.links];
+    } catch { return [initial.links]; }
+  });
   const [photos, setPhotos] = useState<string[]>(() => {
     try { return initial?.images ? JSON.parse(initial.images) : []; } catch { return []; }
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const addLink = () => setLinks(prev => [...prev, '']);
+  const removeLink = (i: number) => setLinks(prev => prev.filter((_, idx) => idx !== i));
+  const updateLink = (i: number, val: string) => setLinks(prev => prev.map((l, idx) => idx === i ? val : l));
+
   const handleSubmit = async () => {
     if (!title.trim() || !body.trim()) { setFormError('Título y contenido son obligatorios.'); return; }
     setSaving(true); setFormError(null);
+    const validLinks = links.filter(l => l.trim());
     try {
       await onSave({
         title, body, scope, type,
         faculty: scope === 'FACULTAD' ? faculty : undefined,
+        links: validLinks.length > 0 ? JSON.stringify(validLinks) : undefined,
         images: photos.length > 0 ? JSON.stringify(photos) : undefined,
       });
     }
@@ -212,6 +238,33 @@ function AnnouncementForm({ T, initial, onSave, onCancel }: { T: ReturnType<type
             <input type="text" value={faculty} onChange={e => setFaculty(e.target.value)} placeholder="Ej: Ingeniería" className="w-full py-2.5 px-3 rounded-xl outline-none" style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }} />
           </div>
         )}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label style={{ color: T.text, fontSize: '12px', fontWeight: 500 }}>Enlaces <span style={{ color: T.textSubtle, fontWeight: 400 }}>(opcional)</span></label>
+            <button type="button" onClick={addLink} className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: T.primaryBg, border: `1px solid ${T.primaryBorder}`, color: T.primary, cursor: 'pointer', fontSize: '11px', fontWeight: 500 }}>
+              <Plus size={11} /> Agregar URL
+            </button>
+          </div>
+          <div className="space-y-2">
+            {links.map((url, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={url}
+                  onChange={e => updateLink(i, e.target.value)}
+                  placeholder={`URL ${i + 1}`}
+                  className="flex-1 py-2.5 px-3 rounded-xl outline-none"
+                  style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: T.inputText, fontSize: '13px' }}
+                />
+                {links.length > 1 && (
+                  <button type="button" onClick={() => removeLink(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.error.text, flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
         <PhotoPicker photos={photos} onChange={setPhotos} />
         {formError && <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: T.error.bg, border: `1px solid ${T.error.border}` }}><AlertCircle size={14} style={{ color: T.error.text }} /><p style={{ color: T.error.text, fontSize: '12px' }}>{formError}</p></div>}
         <div className="flex gap-2 justify-end">

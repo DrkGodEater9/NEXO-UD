@@ -12,5 +12,6 @@ public record AnnouncementRequest(
         @NotNull AnnouncementScope scope,
         @NotNull AnnouncementType type,
         String faculty,
+        String links,
         String images
 ) {}

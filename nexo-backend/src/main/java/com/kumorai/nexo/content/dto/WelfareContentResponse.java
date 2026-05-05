@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record WelfareContentResponse(
         Long id,
         String title,
+        String shortDescription,
         String description,
         String category,
         String links,
