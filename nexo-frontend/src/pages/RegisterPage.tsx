@@ -5,6 +5,7 @@ import { useThemeTokens } from '../context/useThemeTokens';
 import {
   User, Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle,
   ArrowLeft, Sun, Moon, Hash, GraduationCap, Calendar, Building2, BookOpen,
+  Zap, Clock,
 } from 'lucide-react';
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -155,6 +156,13 @@ const CURRICULUM_CODES: CurriculumEntry[] = [
 ];
 
 const CURRICULUM_MAP = new Map(CURRICULUM_CODES.map(c => [c.code, c]));
+
+const LEFT_FEATURES = [
+  { icon: Zap,      text: 'Detecta cruces de horario automÃ¡ticamente', color: '#E8485F' },
+  { icon: BookOpen, text: 'Controla tus crÃ©ditos en tiempo real',       color: '#818CF8' },
+  { icon: Clock,    text: 'Calcula tiempos entre sedes de la UD',       color: '#34D399' },
+  { icon: Calendar, text: 'Guarda mÃºltiples versiones de tu horario',   color: '#FBBF24' },
+];
 
 // ─── Student Code Parser ──────────────────────────────────────────────────────
 
@@ -309,6 +317,103 @@ function StudentInfoCard({ parsed, T, visible }: {
 
 // ─── Register Page ────────────────────────────────────────────────────────────
 
+function RegisterMarketingPanel({ T, navigate }: { T: ReturnType<typeof useThemeTokens>; navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <div
+      className="hidden lg:flex w-[440px] xl:w-[500px] flex-shrink-0 flex-col relative overflow-hidden"
+      style={{
+        background: T.isDark ? 'linear-gradient(145deg,#150F2B 0%,#0D0A1E 100%)' : 'linear-gradient(145deg,#FFF5F6 0%,#F0F0F5 100%)',
+        borderRight: `1px solid ${T.isDark ? 'rgba(255,255,255,0.07)' : '#E8E8ED'}`,
+      }}
+    >
+      {T.isDark && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="rblob1 absolute top-1/4 left-1/4 w-[320px] h-[320px] rounded-full opacity-[0.22]" style={{ background: 'radial-gradient(circle,rgba(232,72,95,.65) 0%,transparent 65%)', filter: 'blur(80px)' }} />
+          <div className="rblob2 absolute bottom-1/3 right-1/4 w-[260px] h-[260px] rounded-full opacity-[0.16]" style={{ background: 'radial-gradient(circle,rgba(129,140,248,.65) 0%,transparent 65%)', filter: 'blur(80px)' }} />
+        </div>
+      )}
+      {!T.isDark && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 right-0 w-[380px] h-[380px] opacity-[0.6]" style={{ background: 'radial-gradient(ellipse at top right,rgba(201,52,76,.07) 0%,transparent 60%)' }} />
+        </div>
+      )}
+
+      <div className="flex flex-col h-full p-12 relative z-10">
+        <div className="re0 flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#E8485F,#A02438)', boxShadow: '0 4px 14px rgba(201,52,76,.45)' }}>
+            <span style={{ color: 'white', fontWeight: 800, fontSize: '16px' }}>N</span>
+          </div>
+          <span style={{ color: T.text, fontWeight: 700, fontSize: '20px', letterSpacing: '-0.03em' }}>NexoUD</span>
+        </div>
+
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="re1 mb-10">
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15, color: T.text, marginBottom: '12px' }}>
+              Planifica tu{' '}
+              <span style={{ backgroundImage: 'linear-gradient(135deg,#E8485F,#818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                semestre
+              </span>
+              <br />con inteligencia
+            </h2>
+            <p style={{ color: T.textMuted, fontSize: '14px', lineHeight: 1.75 }}>
+              La herramienta que los estudiantes de la UD necesitaban para organizar sus horarios antes del dÃ­a de inscripciones.
+            </p>
+          </div>
+
+          <div className="re2 space-y-3">
+            {LEFT_FEATURES.map(({ icon: Icon, text, color }) => (
+              <div key={text} className="flex items-center gap-3 group">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200" style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+                  <Icon size={15} style={{ color }} />
+                </div>
+                <span style={{ color: T.textMuted, fontSize: '13.5px', lineHeight: 1.5 }}>{text}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="re2 mt-10 rounded-2xl overflow-hidden" style={{ background: T.isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', border: `1px solid ${T.isDark ? 'rgba(255,255,255,0.08)' : '#E5E5EA'}`, boxShadow: T.isDark ? '0 16px 48px rgba(0,0,0,0.40)' : '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div className="flex items-center gap-1.5 px-3 py-2.5" style={{ borderBottom: `1px solid ${T.isDark ? 'rgba(255,255,255,0.06)' : '#F0F0F3'}`, background: T.isDark ? 'rgba(255,255,255,0.02)' : '#FAFAFA' }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: '#F87171' }} />
+              <div className="w-2 h-2 rounded-full" style={{ background: '#FBBF24' }} />
+              <div className="w-2 h-2 rounded-full" style={{ background: '#34D399' }} />
+              <span style={{ color: T.isDark ? '#6B6A77' : '#9E9EA6', fontSize: '9px', marginLeft: '6px', fontWeight: 500 }}>Horario 2026-1</span>
+            </div>
+            <div className="p-3">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '4px' }}>
+                {['LUN','MAR','MIÃ‰','JUE','VIE'].map(d => (
+                  <div key={d} className="text-center pb-1.5" style={{ fontSize: '8px', color: T.isDark ? '#5C5B6A' : '#AEAEB8', fontWeight: 700, borderBottom: `1px solid ${T.isDark ? 'rgba(255,255,255,0.05)' : '#F0F0F3'}`, letterSpacing: '0.05em' }}>{d}</div>
+                ))}
+                {[
+                  { c: T.isDark ? '#818CF8' : '#4F46E5', l: 'CÃ¡lculo' },
+                  { c: '', l: '' },
+                  { c: T.isDark ? '#818CF8' : '#4F46E5', l: 'CÃ¡lculo' },
+                  { c: '', l: '' },
+                  { c: T.isDark ? '#818CF8' : '#4F46E5', l: 'CÃ¡lculo' },
+                  { c: '', l: '' },
+                  { c: T.isDark ? '#E8485F' : '#C9344C', l: 'Prog. I' },
+                  { c: '', l: '' },
+                  { c: T.isDark ? '#E8485F' : '#C9344C', l: 'Prog. I' },
+                  { c: '', l: '' },
+                ].map((s, i) => (
+                  <div key={i} className="rounded-md p-1 flex items-center justify-center" style={{ minHeight: '36px', background: s.c ? (T.isDark ? `${s.c}22` : `${s.c}14`) : 'transparent', border: s.c ? `1px solid ${s.c}${T.isDark ? '44' : '30'}` : '1px solid transparent' }}>
+                    {s.l && <span style={{ color: s.c, fontSize: '7px', fontWeight: 700, textAlign: 'center', lineHeight: 1.3 }}>{s.l}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="re2">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 transition-all duration-200" style={{ color: T.textSubtle, background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }} onMouseEnter={e => e.currentTarget.style.color = T.textMuted} onMouseLeave={e => e.currentTarget.style.color = T.textSubtle}>
+            <ArrowLeft size={14} /> Volver al inicio
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const QUICK_STORAGE_KEY = 'nexoud_quick_schedule';
 
 export default function RegisterPage() {
@@ -385,9 +490,12 @@ export default function RegisterPage() {
     <>
       <style>{REG_CSS}</style>
       <div
-        className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden"
+        className="min-h-screen flex"
         style={{ backgroundColor: T.pageBgColor, backgroundImage: T.isDark ? T.pageBg : 'none' }}
       >
+        <RegisterMarketingPanel T={T} navigate={navigate} />
+
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
 
         {/* Animated blobs */}
         {T.showBlobs && (
@@ -422,7 +530,7 @@ export default function RegisterPage() {
             {/* Back */}
             <button
               onClick={() => navigate('/')}
-              className="re0 flex items-center gap-2 mb-8 transition-all"
+              className="re0 lg:hidden flex items-center gap-2 mb-8 transition-all"
               style={{ color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}
               onMouseEnter={e => e.currentTarget.style.color = T.text}
               onMouseLeave={e => e.currentTarget.style.color = T.textMuted}
@@ -431,7 +539,7 @@ export default function RegisterPage() {
             </button>
 
             {/* Logo */}
-            <div className="re1 text-center mb-8">
+            <div className="re1 lg:hidden text-center mb-8">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center"
                   style={{ background: 'linear-gradient(135deg,#E8485F,#A02438)', boxShadow: T.isDark ? '0 4px 16px rgba(201,52,76,.4)' : '0 2px 8px rgba(201,52,76,.22)' }}>
@@ -643,6 +751,7 @@ export default function RegisterPage() {
               <StudentInfoCard parsed={parsed} T={T} visible={codeDirty && formData.studentCode.length >= 4} />
             </div>
           </div>
+        </div>
         </div>
       </div>
     </>

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useEffect, Fragment } from 'react';
+import { useEffect, Fragment, useState } from 'react';
 import {
   Calendar, BookOpen, Zap, ArrowRight, CheckCircle,
   Clock, AlertTriangle, Users, Sun, Moon,
@@ -112,6 +112,14 @@ const CSS_ANIM = `
     0%   { transform: translateX(-100%); }
     100% { transform: translateX(200%);  }
   }
+  @keyframes _tabSettle {
+    from { opacity: 0; transform: translateY(-12px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes _footerNotice {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
   .a-h0 { animation: _fadeUp .8s cubic-bezier(.16,1,.3,1) both; }
   .a-h1 { animation: _fadeUp .8s .13s cubic-bezier(.16,1,.3,1) both; }
@@ -142,13 +150,15 @@ const CSS_ANIM = `
     pointer-events: none;
   }
   .card-shimmer:hover::after { animation: _shimmer .55s ease forwards; }
+  .disclaimer-tab { animation: _tabSettle .62s .2s cubic-bezier(.16,1,.3,1) both; }
+  .footer-notice { animation: _footerNotice .7s cubic-bezier(.16,1,.3,1) both; }
 
   /* Smooth scroll */
   html { scroll-behavior: smooth; }
 
   @media (prefers-reduced-motion: reduce) {
     .a-h0,.a-h1,.a-h2,.a-h3,.a-h4 { animation: none !important; opacity: 1 !important; transform: none !important; }
-    .a-float,.a-blob1,.a-blob2,.a-ring,.a-grad,.a-blink { animation: none !important; }
+    .a-float,.a-blob1,.a-blob2,.a-ring,.a-grad,.a-blink,.disclaimer-tab,.footer-notice { animation: none !important; }
     .rv,.rvc { opacity: 1 !important; transform: none !important; transition: none !important; }
     html { scroll-behavior: auto; }
   }
@@ -159,6 +169,7 @@ export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
+  const [showHeaderNotice, setShowHeaderNotice] = useState(true);
 
   useEffect(() => {
     const io = new IntersectionObserver(
@@ -174,6 +185,18 @@ export default function LandingPage() {
     );
     document.querySelectorAll('.rv').forEach(el => io.observe(el));
     return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const hideTimer = window.setTimeout(() => setShowHeaderNotice(false), 5600);
+    const onScroll = () => {
+      if (window.scrollY > 12) setShowHeaderNotice(false);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.clearTimeout(hideTimer);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   const T = {
@@ -221,6 +244,8 @@ export default function LandingPage() {
     previewTimeBg:    isDark ? 'rgba(255,255,255,0.025)' : '#FAFAFA',
     disclaimerBg:     isDark ? 'rgba(251,191,36,0.07)'  : '#FFFBEB',
     disclaimerBorder: isDark ? 'rgba(251,191,36,0.18)'  : '#FDE68A',
+    disclaimerText:   isDark ? '#C7C2AA' : '#7C5B10',
+    disclaimerStrong: isDark ? '#FBBF24' : '#B45309',
     stepNumBg:        isDark ? 'linear-gradient(135deg,rgba(201,52,76,0.18),rgba(99,102,241,0.14))' : 'rgba(201,52,76,0.08)',
     stepNumBorder:    isDark ? 'rgba(201,52,76,0.32)'   : 'rgba(201,52,76,0.22)',
     stepGlow:         isDark ? '0 0 28px rgba(201,52,76,.18)' : 'none',
@@ -250,8 +275,9 @@ export default function LandingPage() {
 
         {/* ── FLOATING NAVBAR ─────────────────────────────────── */}
         <div className="fixed top-0 left-0 right-0 z-50 px-4 pt-4 pointer-events-none">
+          <div className="w-fit mx-auto pointer-events-auto flex flex-col items-center">
           <header
-            className="w-fit mx-auto px-4 py-2.5 rounded-2xl flex items-center gap-4 pointer-events-auto"
+            className="w-fit px-4 py-2.5 rounded-2xl flex items-center gap-4"
             style={{
               background: T.headerBg,
               backdropFilter: 'blur(28px) saturate(200%)',
@@ -319,22 +345,48 @@ export default function LandingPage() {
               )}
             </div>
           </header>
+          <div
+            className="disclaimer-tab -mt-px flex items-start justify-center gap-2 overflow-hidden transition-all duration-500 ease-[cubic-bezier(.16,1,.3,1)]"
+            style={{
+              width: 'calc(100% - 52px)',
+              maxWidth: 'calc(100vw - 32px)',
+              minWidth: '250px',
+              maxHeight: showHeaderNotice ? '150px' : '0',
+              minHeight: showHeaderNotice ? '92px' : '0',
+              padding: showHeaderNotice ? '13px 16px 15px' : '0',
+              background: T.headerBg,
+              backdropFilter: 'blur(28px) saturate(200%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+              border: showHeaderNotice ? `1px solid ${T.headerBorder}` : '0 solid transparent',
+              borderTop: '0',
+              borderRadius: '0 0 16px 16px',
+              boxShadow: showHeaderNotice ? T.headerShadow : 'none',
+              color: T.disclaimerText,
+              opacity: showHeaderNotice ? 1 : 0,
+              transform: showHeaderNotice ? 'translateY(0)' : 'translateY(-18px) scale(.96)',
+              pointerEvents: showHeaderNotice ? 'auto' : 'none',
+            }}
+          >
+            <AlertTriangle size={13} style={{ color: T.disclaimerStrong, flexShrink: 0, marginTop: '2px' }} />
+            <p
+              className="transition-all duration-500 ease-[cubic-bezier(.16,1,.3,1)]"
+              style={{
+                maxWidth: '260px',
+                opacity: showHeaderNotice ? 1 : 0,
+                fontSize: '11.5px',
+                lineHeight: 1.45,
+                textAlign: 'center',
+              }}
+            >
+              <span style={{ color: T.disclaimerStrong, fontWeight: 700 }}>Herramienta estudiantil independiente.</span>{' '}
+              NexoUD no es el sistema oficial de inscripcion de la Universidad Distrital.
+            </p>
+          </div>
+          </div>
         </div>
 
         {/* Spacer for fixed navbar */}
-        <div style={{ height: '76px' }} />
-
-        {/* ── DISCLAIMER BANNER ──────────────────────────────── */}
-        <div
-          className="px-6 py-2 flex items-center justify-center gap-2 text-center"
-          style={{ background: T.disclaimerBg, borderBottom: `1px solid ${T.disclaimerBorder}` }}
-        >
-          <AlertTriangle size={13} style={{ color: '#D97706', flexShrink: 0 }} />
-          <p style={{ color: T.textMuted, fontSize: '11.5px', lineHeight: 1.5 }}>
-            <span style={{ color: '#D97706', fontWeight: 600 }}>Herramienta estudiantil independiente.</span>{' '}
-            NexoUD no es el sistema oficial de inscripción de la Universidad Distrital.
-          </p>
-        </div>
+        <div style={{ height: showHeaderNotice ? '124px' : '76px', transition: 'height .5s cubic-bezier(.16,1,.3,1)' }} />
 
         {/* ── HERO ────────────────────────────────────────────── */}
         <section className="flex-1 flex items-center px-6 py-24 md:py-32 relative overflow-hidden">
@@ -701,6 +753,20 @@ export default function LandingPage() {
             <p style={{ color: T.footerText, fontSize: '11.5px', opacity: 0.8 }}>
               NexoUD © 2026 · Herramienta estudiantil independiente · No afiliada a la Universidad Distrital
             </p>
+            <div
+              className="footer-notice mt-6 mx-auto flex w-fit max-w-full items-center justify-center gap-2 px-3.5 py-2 rounded-xl"
+              style={{
+                background: T.disclaimerBg,
+                border: `1px solid ${T.disclaimerBorder}`,
+                color: T.disclaimerText,
+              }}
+            >
+              <AlertTriangle size={13} style={{ color: T.disclaimerStrong, flexShrink: 0 }} />
+              <p style={{ fontSize: '11.5px', lineHeight: 1.45 }}>
+                <span style={{ color: T.disclaimerStrong, fontWeight: 700 }}>Herramienta estudiantil independiente.</span>{' '}
+                NexoUD no es el sistema oficial de inscripcion de la Universidad Distrital.
+              </p>
+            </div>
           </div>
         </footer>
 

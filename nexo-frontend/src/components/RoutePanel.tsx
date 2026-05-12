@@ -5,12 +5,19 @@ interface RoutePanelProps {
   loading: boolean;
   error: string | null;
   route: RouteResponse | null;
+  selectedRouteIndex: number;
+  onSelectRoute: (index: number) => void;
   originName: string;
   destName: string;
   onClose: () => void;
 }
 
-export default function RoutePanel({ loading, error, route, originName, destName, onClose }: RoutePanelProps) {
+export default function RoutePanel({ loading, error, route, selectedRouteIndex, onSelectRoute, originName, destName, onClose }: RoutePanelProps) {
+  const selected = route?.alternatives?.[selectedRouteIndex];
+  const steps = selected?.steps ?? route?.steps ?? [];
+  const duration = selected?.totalDuration ?? route?.totalDuration ?? '';
+  const distance = selected?.totalDistance ?? route?.totalDistance ?? '';
+
   return (
     <div style={{
       position: 'absolute',
@@ -99,14 +106,56 @@ export default function RoutePanel({ loading, error, route, originName, destName
           <>
             {/* Summary chips */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              <Chip icon={<Clock size={11} color="#818cf8" />} label={route.totalDuration} color="#818cf8" />
-              <Chip icon={<Navigation size={11} color="#34d399" />} label={route.totalDistance} color="#34d399" />
+              <Chip icon={<Clock size={11} color="#818cf8" />} label={duration} color="#818cf8" />
+              <Chip icon={<Navigation size={11} color="#34d399" />} label={distance} color="#34d399" />
             </div>
+
+            {route.modeSummaries?.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                {route.modeSummaries.map(summary => (
+                  <div key={summary.mode} style={{
+                    background: 'rgba(255,255,255,0.035)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '10px',
+                    padding: '8px',
+                  }}>
+                    <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', margin: 0, marginBottom: '4px' }}>{summary.label}</p>
+                    <p style={{ color: '#fff', fontSize: '12px', fontWeight: 700, margin: 0 }}>{summary.duration || 'N/D'}</p>
+                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', margin: 0 }}>{summary.distance}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {route.alternatives?.length > 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {route.alternatives.map((alternative, i) => {
+                  const active = i === selectedRouteIndex;
+                  return (
+                    <button
+                      key={`${alternative.label}-${i}`}
+                      onClick={() => onSelectRoute(i)}
+                      style={{
+                        textAlign: 'left',
+                        background: active ? 'rgba(129,140,248,0.14)' : 'rgba(255,255,255,0.035)',
+                        border: `1px solid ${active ? 'rgba(129,140,248,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                        borderRadius: '10px',
+                        padding: '9px 10px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ color: active ? '#818cf8' : 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 700 }}>{alternative.label}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: '10px', marginLeft: '8px' }}>{alternative.totalDuration} · {alternative.totalDistance}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Steps */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {route.steps.map((step, i) => (
-                <StepItem key={i} step={step} isLast={i === route.steps.length - 1} />
+              {steps.map((step, i) => (
+                <StepItem key={i} step={step} isLast={i === steps.length - 1} />
               ))}
             </div>
           </>

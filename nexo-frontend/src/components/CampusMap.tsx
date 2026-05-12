@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
-import polyline from '@mapbox/polyline';
 import { CampusData, routeApi, RouteResponse } from '../services/api';
 import RoutePanel from './RoutePanel';
 import { Navigation, X } from 'lucide-react';
@@ -78,6 +77,7 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
   const [destId, setDestId]           = useState<number | null>(null);
   const [route, setRoute]             = useState<RouteResponse | null>(null);
   const [routeError, setRouteError]   = useState<string | null>(null);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
 
   // Init map once
   useEffect(() => {
@@ -193,7 +193,7 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
 
     routeApi
       .calculate(origin.latitude, origin.longitude!, dest.latitude, dest.longitude!)
-      .then(data => { setRoute(data); setRouteMode('result'); })
+      .then(data => { setRoute(data); setSelectedRouteIndex(0); setRouteMode('result'); })
       .catch(err  => { setRouteError(err.message || 'Error calculando ruta'); setRouteMode('error'); });
   }, [routeMode, originId, destId, campusList]);
 
@@ -207,8 +207,8 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
     endMarkersRef.current.forEach(m => m.remove());
     endMarkersRef.current = [];
 
-    // Decode Google's encoded polyline → [[lat,lng], ...]
-    const coords = polyline.decode(route.encodedPolyline) as [number, number][];
+    const coords = route.alternatives?.[selectedRouteIndex]?.coordinates ?? route.coordinates;
+    if (!coords?.length) return;
 
     const poly = L.polyline(coords, {
       color: '#818cf8',
@@ -238,7 +238,7 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
     }
 
     map.fitBounds(poly.getBounds(), { padding: [40, 360] });
-  }, [route]);
+  }, [route, selectedRouteIndex]);
 
   const clearRoute = useCallback(() => {
     polylineRef.current?.remove();
@@ -246,6 +246,7 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
     endMarkersRef.current.forEach(m => m.remove());
     endMarkersRef.current = [];
     setRoute(null);
+    setSelectedRouteIndex(0);
     setRouteError(null);
     setOriginId(null);
     setDestId(null);
@@ -348,6 +349,8 @@ export default function CampusMap({ campusList, selectedId, onSelect, isDark }: 
             loading={routeMode === 'loading'}
             error={routeMode === 'error' ? (routeError ?? 'Error desconocido') : null}
             route={routeMode === 'result' ? route : null}
+            selectedRouteIndex={selectedRouteIndex}
+            onSelectRoute={setSelectedRouteIndex}
             originName={originCampus?.name ?? ''}
             destName={destCampus?.name ?? ''}
             onClose={clearRoute}

@@ -492,7 +492,7 @@ export const campusApi = {
   },
 };
 
-// ─── Campus Route (Google Directions proxy) ──────────────────────────────────
+// ─── Campus Route (HERE Transit proxy) ───────────────────────────────────────
 
 export interface RouteStep {
   instruction: string;
@@ -504,9 +504,23 @@ export interface RouteStep {
 
 export interface RouteResponse {
   encodedPolyline: string;
+  coordinates: [number, number][];
   totalDuration: string;
   totalDistance: string;
   steps: RouteStep[];
+  alternatives: {
+    label: string;
+    totalDuration: string;
+    totalDistance: string;
+    coordinates: [number, number][];
+    steps: RouteStep[];
+  }[];
+  modeSummaries: {
+    mode: string;
+    label: string;
+    duration: string;
+    distance: string;
+  }[];
 }
 
 export const routeApi = {
