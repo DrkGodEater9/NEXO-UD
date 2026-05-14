@@ -6,7 +6,62 @@ import { useThemeTokens } from '../context/useThemeTokens';
 import { scheduleApi, SubjectResponse, SubjectGroupResponse } from '../services/api';
 import { Search, Filter, ChevronDown, ChevronUp, Plus, MapPin, User, Loader2, X } from 'lucide-react';
 
-const FRANJAS = ['Mañana (6-12h)', 'Tarde (12-18h)', 'Noche (18-22h)'];
+const FRANJAS = [
+  { value: 'MANANA', label: 'Mañana (6-12h)', start: 6, end: 12 },
+  { value: 'TARDE', label: 'Tarde (12-18h)', start: 12, end: 18 },
+  { value: 'NOCHE', label: 'Noche (18-22h)', start: 18, end: 22 },
+];
+
+const normalizeForSearch = (value?: string | number | null) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const getSearchFields = (subject: SubjectResponse) => [
+  subject.nombre,
+  subject.codigo,
+  subject.facultad,
+  subject.carrera,
+  ...(subject.grupos || []).map(g => g.docente),
+];
+
+const matchesSearch = (subject: SubjectResponse, query: string) => {
+  if (!query) return true;
+
+  const haystack = getSearchFields(subject).map(normalizeForSearch).join(' ');
+  const terms = query.split(/\s+/).filter(Boolean);
+
+  return terms.every(term => haystack.includes(term));
+};
+
+const getSearchScore = (subject: SubjectResponse, query: string) => {
+  if (!query) return 0;
+
+  const name = normalizeForSearch(subject.nombre);
+  const code = normalizeForSearch(subject.codigo);
+  const teachers = (subject.grupos || []).map(g => normalizeForSearch(g.docente));
+
+  if (code === query || name === query) return 0;
+  if (code.startsWith(query) || name.startsWith(query)) return 1;
+  if (name.includes(query)) return 2;
+  if (teachers.some(teacher => teacher.includes(query))) return 3;
+  return 4;
+};
+
+const groupOverlapsFranja = (group: SubjectGroupResponse, franjaValue: string) => {
+  const franja = FRANJAS.find(f => f.value === franjaValue);
+  if (!franja) return true;
+
+  return group.horarios.some(h => h.horaInicio < franja.end && h.horaFin > franja.start);
+};
+
+const matchesSelectedValue = (value: string | undefined, selected: string) =>
+  !selected || normalizeForSearch(value) === normalizeForSearch(selected);
+
+const getSubjectKey = (subject: SubjectResponse) =>
+  `${subject.id}-${subject.studyPlanId}-${subject.codigo}`;
 
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -37,26 +92,35 @@ export default function SearchPage() {
   }, [isAuthenticated, isRestoring, navigate]);
 
   const facultades = useMemo(() => Array.from(new Set(subjects.map(s => s.facultad).filter(Boolean))).sort(), [subjects]);
-  const carreras = useMemo(() => Array.from(new Set(subjects.filter(s => !selectedFacultad || s.facultad === selectedFacultad).map(s => s.carrera).filter(Boolean))).sort(), [subjects, selectedFacultad]);
+  const carreras = useMemo(() => Array.from(new Set(
+    subjects
+      .filter(s => matchesSelectedValue(s.facultad, selectedFacultad))
+      .map(s => s.carrera)
+      .filter(Boolean)
+  )).sort(), [subjects, selectedFacultad]);
 
   const filtered = useMemo(() => {
-    const text = searchText.toLowerCase();
+    const text = normalizeForSearch(searchText);
     return subjects
+      .map(m => {
+        const grupos = selectedFranja
+          ? (m.grupos || []).filter(g => groupOverlapsFranja(g, selectedFranja))
+          : (m.grupos || []);
+
+        return { ...m, grupos };
+      })
       .filter(m => {
-        const matchText = !text || m.nombre.toLowerCase().includes(text) || m.codigo.includes(text);
-        const matchFacultad = !selectedFacultad || m.facultad === selectedFacultad;
-        const matchCarrera = !selectedCarrera || m.carrera === selectedCarrera;
-        const matchFranja = !selectedFranja || m.grupos.some(g =>
-          g.horarios.some(h => {
-            if (selectedFranja.startsWith('Mañana')) return h.horaInicio >= 6 && h.horaFin <= 12;
-            if (selectedFranja.startsWith('Tarde')) return h.horaInicio >= 12 && h.horaFin <= 18;
-            if (selectedFranja.startsWith('Noche')) return h.horaInicio >= 18;
-            return true;
-          })
-        );
+        const matchText = matchesSearch(m, text);
+        const matchFacultad = matchesSelectedValue(m.facultad, selectedFacultad);
+        const matchCarrera = matchesSelectedValue(m.carrera, selectedCarrera);
+        const matchFranja = !selectedFranja || m.grupos.length > 0;
         return matchText && matchFacultad && matchCarrera && matchFranja;
       })
-      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .sort((a, b) => {
+        const scoreDiff = getSearchScore(a, text) - getSearchScore(b, text);
+        if (scoreDiff !== 0) return scoreDiff;
+        return a.nombre.localeCompare(b.nombre);
+      })
       .slice(0, 50);
   }, [subjects, searchText, selectedFacultad, selectedCarrera, selectedFranja]);
 
@@ -140,7 +204,11 @@ export default function SearchPage() {
                   className="w-full px-3 py-2.5 rounded-xl outline-none transition-all"
                   style={{ background: T.inputBg, border: `1px solid ${T.inputBorder}`, color: value ? T.inputText : T.inputIcon, fontSize: '13px', cursor: 'pointer', appearance: 'none' }}>
                   <option value="">Todas</option>
-                  {options.map((o: string) => <option key={o} value={o} style={{ background: T.selectOptionBg }}>{o}</option>)}
+                  {options.map((o: string | { value: string; label: string }) => {
+                    const optionValue = typeof o === 'string' ? o : o.value;
+                    const optionLabel = typeof o === 'string' ? o : o.label;
+                    return <option key={optionValue} value={optionValue} style={{ background: T.selectOptionBg }}>{optionLabel}</option>;
+                  })}
                 </select>
               </div>
             ))}
@@ -167,13 +235,16 @@ export default function SearchPage() {
               <p style={{ color: T.textSubtle, fontSize: '13px', marginTop: '4px' }}>Escribe el nombre, código o usa los filtros</p>
             </div>
           ) : (
-            filtered.map((materia: SubjectResponse) => (
-              <div key={materia.codigo}
+            filtered.map((materia: SubjectResponse) => {
+              const materiaKey = getSubjectKey(materia);
+
+              return (
+              <div key={materiaKey}
                 className="rounded-2xl overflow-hidden transition-all duration-200"
                 style={{ background: T.cardBg, border: `1px solid ${T.cardBorder}`, boxShadow: T.cardShadow }}>
                 <div
                   className="flex items-center gap-4 p-4 cursor-pointer"
-                  onClick={() => setExpandedMateria(expandedMateria === materia.codigo ? null : materia.codigo)}
+                  onClick={() => setExpandedMateria(expandedMateria === materiaKey ? null : materiaKey)}
                   onMouseEnter={e => { e.currentTarget.style.background = T.cardBg2; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                   <div className="flex-1 min-w-0">
@@ -185,14 +256,14 @@ export default function SearchPage() {
                     <p style={{ color: T.text, fontWeight: 600, fontSize: '15px', marginTop: '4px' }}>{materia.nombre}</p>
                     <p style={{ color: T.textMuted, fontSize: '12px', marginTop: '2px' }}>{materia.grupos?.length || 0} grupo{materia.grupos?.length !== 1 ? 's' : ''} disponible{materia.grupos?.length !== 1 ? 's' : ''}</p>
                   </div>
-                  {expandedMateria === materia.codigo ? <ChevronUp size={18} style={{ color: T.textMuted, flexShrink: 0 }} /> : <ChevronDown size={18} style={{ color: T.textMuted, flexShrink: 0 }} />}
+                  {expandedMateria === materiaKey ? <ChevronUp size={18} style={{ color: T.textMuted, flexShrink: 0 }} /> : <ChevronDown size={18} style={{ color: T.textMuted, flexShrink: 0 }} />}
                 </div>
 
-                {expandedMateria === materia.codigo && materia.grupos && (
+                {expandedMateria === materiaKey && materia.grupos && (
                   <div className="px-4 pb-4" style={{ borderTop: `1px solid ${T.divider}` }}>
                     <div className="space-y-3 mt-4">
                       {materia.grupos.map((grupo: SubjectGroupResponse) => (
-                        <div key={grupo.grupoCode} className="p-4 rounded-xl"
+                        <div key={grupo.id ?? `${materiaKey}-${grupo.grupoCode}`} className="p-4 rounded-xl"
                           style={{ background: T.cardBg2, border: `1px solid ${T.divider}` }}>
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
@@ -234,7 +305,8 @@ export default function SearchPage() {
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
