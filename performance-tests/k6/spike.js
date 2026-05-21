@@ -17,7 +17,7 @@ export const options = {
 };
 
 export default function spike() {
-  const res = http.get(`${BASE_URL}/api/v1/announcements`);
-  check(res, { 'announcements 200': (r) => r.status === 200 });
+  const res = http.get(`${BASE_URL}/api/v1/campus`);
+  check(res, { 'campus 200': (r) => r.status === 200 });
   sleep(1);
 }

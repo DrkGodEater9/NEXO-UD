@@ -18,8 +18,8 @@ export const options = {
 };
 
 export default function stress() {
-  // Use a potentially heavy endpoint; adjust to a real heavy endpoint if available
-  const res = http.get(`${BASE_URL}/api/v1/reports`);
-  check(res, { 'reports 200': (r) => r.status === 200 });
+  // Use public endpoints for stress testing
+  const res = http.get(`${BASE_URL}/api/v1/announcements`);
+  check(res, { 'announcements 200': (r) => r.status === 200 });
   sleep(1);
 }

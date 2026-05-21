@@ -15,7 +15,7 @@ export const options = {
 };
 
 export default function soak() {
-  const res = http.get(`${BASE_URL}/api/v1/schedules`);
-  check(res, { 'schedules 200': (r) => r.status === 200 });
+  const res = http.get(`${BASE_URL}/api/v1/campus`);
+  check(res, { 'campus 200': (r) => r.status === 200 });
   sleep(2);
 }

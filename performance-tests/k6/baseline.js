@@ -15,11 +15,11 @@ export const options = {
   },
 };
 
-// Realistic endpoints based on nexo-backend conventions (/api/v1/...)
+// Public endpoints that don't require authentication (see SecurityConfig.java)
 const PATHS = [
   '/api/v1/announcements',
-  '/api/v1/schedules',
   '/api/v1/campus',
+  '/api/v1/welfare',
 ];
 
 const LOGIN_PATH = '/api/v1/auth/login';
