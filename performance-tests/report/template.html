@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>k6 Report</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px }
+      table { border-collapse: collapse; margin-bottom: 20px }
+      td, th { border: 1px solid #ccc; padding: 6px 10px }
+      h1 { margin-bottom: 8px }
+    </style>
+  </head>
+  <body>
+    <h1>k6 Report</h1>
+    <p>Generated: {{ generated }}</p>
+    {% for name, vals in metrics.items() %}
+      <h2>{{ name }} ({{ vals.type }})</h2>
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+        {% for k, v in vals.items() %}
+          {% if k != 'type' %}
+            <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+          {% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  </body>
+</html>

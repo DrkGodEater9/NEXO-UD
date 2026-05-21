@@ -1,0 +1,32 @@
+name: Performance Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0' # weekly
+
+jobs:
+  k6-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create results dir
+        run: mkdir -p performance-tests/results
+      - name: Run all scenarios and generate reports
+        run: |
+          chmod +x performance-tests/run_all.sh
+          ./performance-tests/run_all.sh
+
+      - name: Setup Python (ensure reports exist)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Upload reports artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-reports
+          path: |
+            performance-tests/results/*.json
+            performance-tests/results/*-report

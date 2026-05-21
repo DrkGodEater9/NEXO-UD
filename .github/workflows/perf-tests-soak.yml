@@ -1,0 +1,38 @@
+name: Soak Performance Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *' # run once a month
+
+jobs:
+  k6-soak:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create results dir
+        run: mkdir -p performance-tests/results
+
+      - name: Run soak scenario
+        run: |
+          echo "Running soak..."
+          docker run --rm -v ${{ github.workspace }}:/work -w /work grafana/k6:latest run performance-tests/k6/soak.js --out json=performance-tests/results/soak.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Generate report
+        run: |
+          python performance-tests/report/generate_report.py performance-tests/results/soak.json -o performance-tests/results/soak-report -t performance-tests/report/template.html || echo "Failed to generate report, maybe template.html is missing"
+
+      - name: Upload reports artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-perf-reports
+          path: |
+            performance-tests/results/*.json
+            performance-tests/results/*-report
