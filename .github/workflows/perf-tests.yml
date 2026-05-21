@@ -37,24 +37,20 @@ jobs:
         run: |
           cd nexo-backend
           chmod +x mvnw
-          ./mvnw spring-boot:run > /tmp/backend.log 2>&1 &
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/nexo_db --spring.datasource.username=postgres --spring.datasource.password=200600" > /tmp/backend.log 2>&1 &
           echo $! > /tmp/backend.pid
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/nexo_db
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: 200600
 
       - name: Wait for backend
         run: |
           for i in {1..60}; do
-            if nc -z localhost 8080; then
+            if curl -s -f http://127.0.0.1:8080/actuator/health > /dev/null; then
               echo "Backend is ready"
               exit 0
             fi
             echo "Waiting for backend... ($i/60)"
-            if [ $((i % 10)) -eq 0 ]; then
+            if [ $((i % 15)) -eq 0 ]; then
               echo "Recent logs:"
-              tail -20 /tmp/backend.log 2>/dev/null || echo "No logs yet"
+              tail -30 /tmp/backend.log 2>/dev/null || echo "No logs yet"
             fi
             sleep 2
           done
