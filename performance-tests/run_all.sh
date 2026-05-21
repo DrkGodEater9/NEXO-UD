@@ -3,16 +3,23 @@ set -euo pipefail
 
 ROOT_DIR=$(pwd)
 mkdir -p "$ROOT_DIR/performance-tests/results"
-chmod 777 "$ROOT_DIR/performance-tests/results"
+
+# Verify backend is reachable before running tests
+echo "Verifying backend is reachable..."
+if ! curl -s -f http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
+  echo "ERROR: Backend is not reachable at http://127.0.0.1:8080"
+  exit 1
+fi
+echo "Backend is reachable!"
 
 echo "Running baseline..."
-docker run --rm --add-host=host.docker.internal:host-gateway -e BASE_URL=http://host.docker.internal:8080 -v "$ROOT_DIR":/work -w /work grafana/k6:latest run performance-tests/k6/baseline.js --out json=performance-tests/results/baseline.json
+k6 run -e BASE_URL=http://127.0.0.1:8080 performance-tests/k6/baseline.js --out json=performance-tests/results/baseline.json
 
 echo "Running spike..."
-docker run --rm --add-host=host.docker.internal:host-gateway -e BASE_URL=http://host.docker.internal:8080 -v "$ROOT_DIR":/work -w /work grafana/k6:latest run performance-tests/k6/spike.js --out json=performance-tests/results/spike.json
+k6 run -e BASE_URL=http://127.0.0.1:8080 performance-tests/k6/spike.js --out json=performance-tests/results/spike.json
 
 echo "Running stress..."
-docker run --rm --add-host=host.docker.internal:host-gateway -e BASE_URL=http://host.docker.internal:8080 -v "$ROOT_DIR":/work -w /work grafana/k6:latest run performance-tests/k6/stress.js --out json=performance-tests/results/stress.json
+k6 run -e BASE_URL=http://127.0.0.1:8080 performance-tests/k6/stress.js --out json=performance-tests/results/stress.json
 
 echo "Generating reports..."
 python3 performance-tests/report/generate_report.py performance-tests/results/baseline.json -o performance-tests/results/baseline-report -t performance-tests/report/template.html

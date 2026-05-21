@@ -33,54 +33,77 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6 -y
+
       - name: Start backend
         run: |
           cd nexo-backend
           chmod +x mvnw
-          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/nexo_db --spring.datasource.username=postgres --spring.datasource.password=200600" > /tmp/backend.log 2>&1 &
+          nohup ./mvnw spring-boot:run \
+            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/nexo_db --spring.datasource.username=postgres --spring.datasource.password=200600 --spring.jpa.hibernate.ddl-auto=update --spring.flyway.enabled=false" \
+            > /tmp/backend.log 2>&1 &
           echo $! > /tmp/backend.pid
 
       - name: Wait for backend
         run: |
-          for i in {1..60}; do
-            if curl -s -f http://127.0.0.1:8080/actuator/health > /dev/null; then
-              echo "Backend is ready"
+          for i in $(seq 1 90); do
+            if curl -s -f http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
+              echo "Backend is ready after ${i}s"
               exit 0
             fi
-            echo "Waiting for backend... ($i/60)"
-            if [ $((i % 15)) -eq 0 ]; then
-              echo "Recent logs:"
+            if ! kill -0 $(cat /tmp/backend.pid) 2>/dev/null; then
+              echo "Backend process died! Logs:"
+              cat /tmp/backend.log
+              exit 1
+            fi
+            echo "Waiting for backend... ($i/90)"
+            if [ $((i % 20)) -eq 0 ]; then
+              echo "=== Recent backend logs ==="
               tail -30 /tmp/backend.log 2>/dev/null || echo "No logs yet"
             fi
             sleep 2
           done
-          echo "Backend failed to start. Final logs:"
-          tail -100 /tmp/backend.log 2>/dev/null || echo "No logs available"
+          echo "Backend failed to start after 180s. Full logs:"
+          cat /tmp/backend.log
           exit 1
 
       - name: Create results dir
-        run: |
-          mkdir -p performance-tests/results
-          chmod 777 performance-tests/results
+        run: mkdir -p performance-tests/results
 
       - name: Run soak scenario
         run: |
           echo "Running soak..."
-          docker run --rm --add-host=host.docker.internal:host-gateway -e BASE_URL=http://host.docker.internal:8080 -v ${{ github.workspace }}:/work -w /work grafana/k6:latest run performance-tests/k6/soak.js --out json=performance-tests/results/soak.json
+          k6 run -e BASE_URL=http://127.0.0.1:8080 performance-tests/k6/soak.js --out json=performance-tests/results/soak.json
 
       - name: Setup Python
+        if: always()
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
-      - name: Generate report
-        run: |
-          python performance-tests/report/generate_report.py performance-tests/results/soak.json -o performance-tests/results/soak-report -t performance-tests/report/template.html || echo "Failed to generate report, maybe template.html is missing"
 
-      - name: Upload reports artifacts
+      - name: Generate soak report
+        if: always()
+        run: |
+          pip install jinja2
+          python3 performance-tests/report/generate_report.py performance-tests/results/soak.json -o performance-tests/results/soak-report -t performance-tests/report/template.html
+
+      - name: Upload soak results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: soak-perf-reports
+          name: soak-report
           path: |
-            performance-tests/results/*.json
-            performance-tests/results/*-report
+            performance-tests/results/soak.json
+            performance-tests/results/soak-report
+
+      - name: Print backend logs on failure
+        if: failure()
+        run: |
+          echo "=== Backend logs ==="
+          cat /tmp/backend.log 2>/dev/null || echo "No logs available"
