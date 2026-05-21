@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR=$(pwd)
 mkdir -p "$ROOT_DIR/performance-tests/results"
+chmod 777 "$ROOT_DIR/performance-tests/results"
 
 echo "Running baseline..."
 docker run --rm -v "$ROOT_DIR":/work -w /work grafana/k6:latest run performance-tests/k6/baseline.js --out json=performance-tests/results/baseline.json
