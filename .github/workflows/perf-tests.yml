@@ -8,9 +8,52 @@ on:
 jobs:
   k6-baseline:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: nexo_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 200600
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Start backend
+        run: |
+          cd nexo-backend
+          chmod +x mvnw
+          ./mvnw spring-boot:run &
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/nexo_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: 200600
+
+      - name: Wait for backend
+        run: |
+          for i in {1..40}; do
+            if nc -z localhost 8080; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            echo "Waiting for backend... ($i/40)"
+            sleep 3
+          done
+          echo "Backend failed to start"
+          exit 1
 
       - name: Create results dir
         run: mkdir -p performance-tests/results
