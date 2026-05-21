@@ -27,3 +27,6 @@ nexo-backend/target/
 # OS
 .DS_Store
 Thumbs.db
+
+# Performance Tests Results
+performance-tests/results/k6/*.json
