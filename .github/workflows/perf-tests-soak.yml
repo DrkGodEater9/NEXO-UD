@@ -66,7 +66,7 @@ jobs:
       - name: Run soak scenario
         run: |
           echo "Running soak..."
-          docker run --rm --network host -v ${{ github.workspace }}:/work -w /work grafana/k6:latest run performance-tests/k6/soak.js --out json=performance-tests/results/soak.json
+          docker run --rm --add-host=host.docker.internal:host-gateway -e BASE_URL=http://host.docker.internal:8080 -v ${{ github.workspace }}:/work -w /work grafana/k6:latest run performance-tests/k6/soak.js --out json=performance-tests/results/soak.json
 
       - name: Setup Python
         uses: actions/setup-python@v4
