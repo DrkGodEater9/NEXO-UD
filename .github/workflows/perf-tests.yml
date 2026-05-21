@@ -3,7 +3,7 @@ name: Performance Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 3 * * 0' # weekly
+    - cron: '0 3 * * 0'
 
 jobs:
   k6-baseline:
@@ -15,7 +15,6 @@ jobs:
           POSTGRES_DB: nexo_db
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: 200600
-          POSTGRES_INITDB_ARGS: "-U postgres"
         ports:
           - 5432:5432
         options: >-
@@ -40,46 +39,84 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
           sudo apt-get install k6 -y
+          k6 version
 
       - name: Start backend
         run: |
           cd nexo-backend
           chmod +x mvnw
           nohup ./mvnw spring-boot:run \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/nexo_db --spring.datasource.username=postgres --spring.datasource.password=200600 --spring.jpa.hibernate.ddl-auto=update --spring.flyway.enabled=false" \
+            -Dspring.datasource.url=jdbc:postgresql://127.0.0.1:5432/nexo_db \
+            -Dspring.datasource.username=postgres \
+            -Dspring.datasource.password=200600 \
+            -Dspring.jpa.hibernate.ddl-auto=update \
+            -Dspring.flyway.enabled=false \
+            -Dserver.port=8080 \
             > /tmp/backend.log 2>&1 &
           echo $! > /tmp/backend.pid
+          echo "Backend PID: $(cat /tmp/backend.pid)"
 
       - name: Wait for backend
         run: |
+          echo "Waiting for backend to start on port 8080..."
           for i in $(seq 1 90); do
             if curl -s -f http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
-              echo "Backend is ready after ${i}s"
+              echo "Backend is ready after $((i*2)) seconds!"
+              curl -s http://127.0.0.1:8080/actuator/health
+              echo ""
               exit 0
             fi
             if ! kill -0 $(cat /tmp/backend.pid) 2>/dev/null; then
-              echo "Backend process died! Logs:"
+              echo "FATAL: Backend process died!"
+              echo "=== Full backend logs ==="
               cat /tmp/backend.log
               exit 1
             fi
-            echo "Waiting for backend... ($i/90)"
-            if [ $((i % 20)) -eq 0 ]; then
-              echo "=== Recent backend logs ==="
-              tail -30 /tmp/backend.log 2>/dev/null || echo "No logs yet"
+            echo "Waiting... ($i/90) - PID $(cat /tmp/backend.pid) is alive"
+            if [ $((i % 15)) -eq 0 ]; then
+              echo "--- Recent logs ---"
+              tail -20 /tmp/backend.log 2>/dev/null || true
+              echo "---"
             fi
             sleep 2
           done
-          echo "Backend failed to start after 180s. Full logs:"
+          echo "FATAL: Backend did not start in 180 seconds"
+          echo "=== Full backend logs ==="
           cat /tmp/backend.log
           exit 1
 
-      - name: Create results dir
-        run: mkdir -p performance-tests/results
-
-      - name: Run all scenarios and generate reports
+      - name: Verify backend is reachable
         run: |
-          chmod +x performance-tests/run_all.sh
-          ./performance-tests/run_all.sh
+          echo "Testing actual endpoints..."
+          curl -v http://127.0.0.1:8080/actuator/health || true
+          curl -v http://127.0.0.1:8080/api/v1/campus || true
+          curl -v http://127.0.0.1:8080/api/v1/schedules || true
+          curl -v http://127.0.0.1:8080/api/v1/announcements || true
+          echo "Backend PID still alive: $(kill -0 $(cat /tmp/backend.pid) 2>/dev/null && echo YES || echo NO)"
+
+      - name: Run baseline test
+        run: |
+          mkdir -p performance-tests/results
+          echo "Running baseline with BASE_URL=http://127.0.0.1:8080"
+          k6 run -e BASE_URL=http://127.0.0.1:8080 \
+            performance-tests/k6/baseline.js \
+            --out json=performance-tests/results/baseline.json
+
+      - name: Run spike test
+        if: success()
+        run: |
+          echo "Running spike with BASE_URL=http://127.0.0.1:8080"
+          k6 run -e BASE_URL=http://127.0.0.1:8080 \
+            performance-tests/k6/spike.js \
+            --out json=performance-tests/results/spike.json
+
+      - name: Run stress test
+        if: success()
+        run: |
+          echo "Running stress with BASE_URL=http://127.0.0.1:8080"
+          k6 run -e BASE_URL=http://127.0.0.1:8080 \
+            performance-tests/k6/stress.js \
+            --out json=performance-tests/results/stress.json
 
       - name: Setup Python
         if: always()
@@ -87,7 +124,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Upload reports artifacts
+      - name: Generate reports
+        if: always()
+        run: |
+          pip install jinja2
+          for scenario in baseline spike stress; do
+            if [ -f "performance-tests/results/${scenario}.json" ]; then
+              python3 performance-tests/report/generate_report.py \
+                "performance-tests/results/${scenario}.json" \
+                -o "performance-tests/results/${scenario}-report" \
+                -t performance-tests/report/template.html || true
+            fi
+          done
+
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -96,8 +146,8 @@ jobs:
             performance-tests/results/*.json
             performance-tests/results/*-report
 
-      - name: Print backend logs on failure
-        if: failure()
+      - name: Print backend logs
+        if: always()
         run: |
-          echo "=== Backend logs ==="
+          echo "=== Full backend logs ==="
           cat /tmp/backend.log 2>/dev/null || echo "No logs available"
