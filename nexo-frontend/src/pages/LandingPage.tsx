@@ -429,7 +429,7 @@ export default function LandingPage() {
               >
                 <span className="a-blink w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: T.badgeColor, display: 'inline-block' }} />
                 <span style={{ color: T.badgeColor, fontSize: '12px', fontWeight: 600, letterSpacing: '0.01em' }}>
-                  Universidad Distrital · Planificador académico
+                  Planificador académico
                 </span>
               </div>
 
