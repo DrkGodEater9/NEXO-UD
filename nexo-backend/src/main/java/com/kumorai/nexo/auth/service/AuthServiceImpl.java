@@ -53,6 +53,28 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest request) {
+        // Clean up conflicting inactive (phantom) accounts first to allow re-registration
+        userRepository.findByEmail(request.email()).ifPresent(user -> {
+            if (!user.isActive()) {
+                userRepository.delete(user);
+                userRepository.flush();
+            }
+        });
+        userRepository.findByNickname(request.nickname()).ifPresent(user -> {
+            if (!user.isActive()) {
+                userRepository.delete(user);
+                userRepository.flush();
+            }
+        });
+        if (request.studentCode() != null && !request.studentCode().trim().isEmpty()) {
+            userRepository.findByStudentCode(request.studentCode()).ifPresent(user -> {
+                if (!user.isActive()) {
+                    userRepository.delete(user);
+                    userRepository.flush();
+                }
+            });
+        }
+
         if (userRepository.existsByEmail(request.email())) {
             throw NexoException.conflict("El correo ya está registrado");
         }

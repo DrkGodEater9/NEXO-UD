@@ -42,6 +42,7 @@ public class EmailService {
             message.setSubject(subject);
             message.setText(text);
             mailSender.send(message);
+            log.info("Correo enviado exitosamente a '{}' — asunto: '{}'", to, subject);
         } catch (Exception e) {
             log.warn("No se pudo enviar el correo a '{}' — asunto: '{}'. Causa: {}. Contenido:\n{}",
                      to, subject, e.getMessage(), text);
