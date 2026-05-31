@@ -14,11 +14,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 public abstract class BaseIntegrationTest {
 
     @Container
-    protected static final PostgreSQLContainer<?> postgreSQLContainer = 
-            new PostgreSQLContainer<>("postgres:15-alpine")
-                .withDatabaseName("nexo_test_db")
-                .withUsername("test_user")
-                .withPassword("test_pass");
+    protected static final PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:15-alpine")
+            .withDatabaseName("nexo_test_db")
+            .withUsername("test_user")
+            .withPassword("test_pass");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
