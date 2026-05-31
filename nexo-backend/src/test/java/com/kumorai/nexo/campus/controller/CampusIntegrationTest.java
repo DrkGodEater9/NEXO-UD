@@ -22,7 +22,8 @@ public class CampusIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Debería retornar lista vacía o llena de campus con status 200")
     void testGetAllCampus() throws Exception {
-        // En un test de integración real, los datos iniciales vienen de Flyway (V1__init.sql)
+        // En un test de integración real, los datos iniciales vienen de Flyway
+        // (V1__init.sql)
         mockMvc.perform(get("/api/v1/campus")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
