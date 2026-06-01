@@ -79,32 +79,112 @@ export default function PlannerPage() {
   }, []);
 
   useEffect(() => {
-    if (subjects.length > 0 && location.state?.editSchedule) {
-      const editSchedule = location.state.editSchedule;
-      setEditingId(editSchedule.id || null);
-      if (editSchedule.materias) {
-        const reconstructed: SelectedGroup[] = [];
-        let ci = 0;
-        editSchedule.materias.forEach((saved: any) => {
-          const materia = subjects.find(s => s.codigo === saved.codigo);
-          if (!materia) return;
-          const grupo = materia.grupos?.find((g) => g.grupoCode === saved.grupo);
-          if (!grupo) return;
-          reconstructed.push({
-            nombre: materia.nombre,
-            codigo: materia.codigo,
-            grupo: grupo.grupoCode,
-            color: saved.customHex || saved.color || COLORS[ci % COLORS.length],
-            horarios: grupo.horarios,
-            docente: grupo.docente,
-          });
-          ci++;
-        });
-        setSelected(reconstructed);
-        setColorIdx(ci);
+    if (subjects.length > 0) {
+      let initialSelected: SelectedGroup[] = [];
+      let initialEditingId: string | null = null;
+      let initialColorIdx = 0;
+
+      // 1. Try loading draft from sessionStorage
+      const draft = sessionStorage.getItem('nexoud_planner_draft');
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          initialSelected = parsed.selected || [];
+          initialEditingId = parsed.editingId || null;
+          initialColorIdx = parsed.colorIdx || 0;
+        } catch (e) {
+          console.error('Error parsing planner draft:', e);
+        }
       }
+
+      // 2. Overwrite if editSchedule is passed (explicitly editing a schedule)
+      if (location.state?.editSchedule) {
+        const editSchedule = location.state.editSchedule;
+        initialEditingId = editSchedule.id || null;
+        if (editSchedule.materias) {
+          const reconstructed: SelectedGroup[] = [];
+          let ci = 0;
+          editSchedule.materias.forEach((saved: any) => {
+            const materia = subjects.find(s => s.codigo === saved.codigo);
+            if (!materia) return;
+            const grupo = materia.grupos?.find((g) => g.grupoCode === saved.grupo);
+            if (!grupo) return;
+            reconstructed.push({
+              nombre: materia.nombre,
+              codigo: materia.codigo,
+              grupo: grupo.grupoCode,
+              color: saved.customHex || saved.color || COLORS[ci % COLORS.length],
+              horarios: grupo.horarios,
+              docente: grupo.docente,
+            });
+            ci++;
+          });
+          initialSelected = reconstructed;
+          initialColorIdx = ci;
+        }
+      }
+
+      // 3. Process addSubject if passed (from Search page)
+      if (location.state?.addSubject && location.state?.addGrupoCode) {
+        const addSubject = location.state.addSubject as SubjectResponse;
+        const addGrupoCode = location.state.addGrupoCode as string;
+
+        const existingIdx = initialSelected.findIndex(s => s.codigo === addSubject.codigo);
+        const targetGroup = addSubject.grupos?.find(g => g.grupoCode === addGrupoCode);
+
+        if (targetGroup) {
+          const hasConflict = targetGroup.horarios.some(h =>
+            initialSelected.some(s => s.codigo !== addSubject.codigo && s.horarios.some(sh =>
+              sh.dia === h.dia && sh.horaInicio < h.horaFin && sh.horaFin > h.horaInicio
+            ))
+          );
+
+          if (hasConflict) {
+            setConflictMsg(`⚠️ Conflicto detectado al agregar "${addSubject.nombre}"`);
+          } else {
+            setConflictMsg('');
+          }
+
+          if (existingIdx !== -1) {
+            // Replace the group
+            initialSelected = initialSelected.map((s, idx) => idx === existingIdx
+              ? { ...s, grupo: targetGroup.grupoCode, horarios: targetGroup.horarios, docente: targetGroup.docente }
+              : s
+            );
+          } else {
+            // Add new group
+            initialSelected = [...initialSelected, {
+              nombre: addSubject.nombre,
+              codigo: addSubject.codigo,
+              grupo: targetGroup.grupoCode,
+              color: COLORS[initialColorIdx % COLORS.length],
+              horarios: targetGroup.horarios,
+              docente: targetGroup.docente,
+            }];
+            initialColorIdx++;
+          }
+        }
+
+        // Clean up navigation state so refreshing does not trigger it again
+        window.history.replaceState({}, document.title);
+      }
+
+      setSelected(initialSelected);
+      setEditingId(initialEditingId);
+      setColorIdx(initialColorIdx);
     }
   }, [subjects, location.state]);
+
+  // Persist draft whenever selected, editingId or colorIdx change
+  useEffect(() => {
+    if (!loading && subjects.length > 0) {
+      sessionStorage.setItem('nexoud_planner_draft', JSON.stringify({
+        selected,
+        editingId,
+        colorIdx
+      }));
+    }
+  }, [selected, editingId, colorIdx, loading, subjects]);
 
   const facultades = useMemo(() =>
     Array.from(new Set(subjects.map(s => s.facultad).filter(Boolean))).sort(),
@@ -139,7 +219,7 @@ export default function PlannerPage() {
     if (!hasCarrera) {
       const seen = new Map<string, SubjectResponse & { _allGrupos: SubjectGroupResponse[] }>();
       filtered.forEach(m => {
-        const key = m.nombre.trim().toUpperCase();
+        const key = m.codigo.trim().toUpperCase();
         if (!seen.has(key)) {
           seen.set(key, { ...m, _allGrupos: [...(m.grupos || [])] });
         } else {

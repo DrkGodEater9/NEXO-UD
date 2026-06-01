@@ -97,7 +97,7 @@ export default function QuickPage() {
     if (!hasCarrera) {
       const seen = new Map<string, SubjectResponse & { _allGrupos: SubjectGroupResponse[] }>();
       filtered.forEach(m => {
-        const key = m.nombre.trim().toUpperCase();
+        const key = m.codigo.trim().toUpperCase();
         if (!seen.has(key)) {
           seen.set(key, { ...m, _allGrupos: [...(m.grupos || [])] });
         } else {

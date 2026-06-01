@@ -101,7 +101,9 @@ export default function SearchPage() {
 
   const filtered = useMemo(() => {
     const text = normalizeForSearch(searchText);
-    return subjects
+    const hasCarrera = !!selectedCarrera;
+
+    const filteredList = subjects
       .map(m => {
         const grupos = selectedFranja
           ? (m.grupos || []).filter(g => groupOverlapsFranja(g, selectedFranja))
@@ -115,7 +117,35 @@ export default function SearchPage() {
         const matchCarrera = matchesSelectedValue(m.carrera, selectedCarrera);
         const matchFranja = !selectedFranja || m.grupos.length > 0;
         return matchText && matchFacultad && matchCarrera && matchFranja;
-      })
+      });
+
+    // Deduplicate by codigo when no carrera filter is active
+    if (!hasCarrera) {
+      const seen = new Map<string, SubjectResponse & { _allGrupos: SubjectGroupResponse[] }>();
+      filteredList.forEach(m => {
+        const key = m.codigo.trim().toUpperCase();
+        if (!seen.has(key)) {
+          seen.set(key, { ...m, _allGrupos: [...(m.grupos || [])] });
+        } else {
+          const existing = seen.get(key)!;
+          (m.grupos || []).forEach(g => {
+            if (!existing._allGrupos.find(eg => eg.grupoCode === g.grupoCode)) {
+              existing._allGrupos.push(g);
+            }
+          });
+        }
+      });
+      return Array.from(seen.values())
+        .map(m => ({ ...m, grupos: m._allGrupos }))
+        .sort((a, b) => {
+          const scoreDiff = getSearchScore(a, text) - getSearchScore(b, text);
+          if (scoreDiff !== 0) return scoreDiff;
+          return a.nombre.localeCompare(b.nombre);
+        })
+        .slice(0, 50);
+    }
+
+    return filteredList
       .sort((a, b) => {
         const scoreDiff = getSearchScore(a, text) - getSearchScore(b, text);
         if (scoreDiff !== 0) return scoreDiff;
@@ -291,7 +321,7 @@ export default function SearchPage() {
                               ))}
                             </div>
                             <button
-                              onClick={() => navigate('/planner')}
+                              onClick={() => navigate('/planner', { state: { addSubject: materia, addGrupoCode: grupo.grupoCode } })}
                               className="flex items-center gap-1.5 px-3 py-2 rounded-xl flex-shrink-0 transition-all"
                               style={{ background: '#C9344C', color: 'white', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
                               onMouseEnter={e => e.currentTarget.style.background = '#A02438'}
